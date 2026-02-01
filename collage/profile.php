@@ -960,7 +960,7 @@ input, textarea, select {
 }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #333; line-height: 1.6; }
         .container { max-width: 420px; margin: 0 auto; background: white; min-height: 100vh; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; position: relative; }
+        .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px; text-align: center; position: relative; }
         .header h1 { font-size: 24px; margin-bottom: 5px; }
         .header p { opacity: 0.9; font-size: 14px; }
         .logout { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; padding: 8px 12px; text-decoration: none; border-radius: 20px; font-size: 12px; backdrop-filter: blur(10px); }
@@ -968,7 +968,7 @@ input, textarea, select {
         .tabs::-webkit-scrollbar { height: 4px; }
         .tabs::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 2px; }
         .tabs a { flex: 0 0 auto; min-width: 70px; padding: 12px 10px; text-decoration: none; color: #6c757d; text-align: center; border-bottom: 3px solid transparent; transition: all 0.3s; font-size: 12px; white-space: nowrap; }
-        .tabs a.active { color: #667eea; border-bottom-color: #667eea; font-weight: 600; background: #f8f9ff; }
+        .tabs a.active { color: #10b981; border-bottom-color: #10b981; font-weight: 600; background: #f0fdf4; }
         .tabs a:hover { background: #f8f9fa; }
         .tabs a .tab-text { display: inline; }
         @media (max-width: 600px) {
@@ -982,27 +982,27 @@ input, textarea, select {
         .content { padding: 20px; }
         .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .bill-item { border: 2px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s; }
-        .bill-item:hover { border-color: #667eea; }
-        .bill-item.selected { border-color: #667eea; background: #f8f9ff; }
+        .bill-item:hover { border-color: #10b981; }
+        .bill-item.selected { border-color: #10b981; background: #f0fdf4; }
         .bill-item input[type="checkbox"] { margin-right: 10px; transform: scale(1.2); }
         .form-group { margin-bottom: 20px; }
         .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
         .form-group select { width: 100%; padding: 12px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 16px; background: white; }
         .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; text-decoration: none; display: inline-block; text-align: center; transition: all 0.3s; }
-        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); }
+        .btn-primary { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4); }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn-small { width: auto; padding: 8px 16px; font-size: 12px; margin: 5px; display: inline-block; }
-        .total-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; margin: 20px 0; text-align: center; }
+        .total-box { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px; border-radius: 12px; margin: 20px 0; text-align: center; }
         .total-box h3 { font-size: 24px; }
         .empty-state { text-align: center; padding: 60px 20px; color: #6c757d; }
         .empty-state h3 { margin-bottom: 10px; color: #333; }
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); overflow-y: auto; }
         .modal-content { position: relative; background: white; width: 90%; max-width: 500px; border-radius: 12px; margin: 30px auto; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-        .modal-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; position: relative; }
+        .modal-header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px; text-align: center; position: relative; }
         .modal-body { padding: 20px; max-height: 70vh; overflow-y: auto; }
         .payment-info { text-align: center; margin-bottom: 20px; }
-        .va-number { font-size: 20px; font-weight: bold; font-family: monospace; background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; border: 2px dashed #667eea; user-select: all; }
+        .va-number { font-size: 20px; font-weight: bold; font-family: monospace; background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; border: 2px dashed #10b981; user-select: all; }
         .qr-container { text-align: center; margin: 20px 0; min-height: 270px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .qr-container canvas { border: 1px solid #dee2e6; border-radius: 8px; }
         .instruction-list { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; }
@@ -1032,7 +1032,7 @@ input, textarea, select {
             padding: 20px; 
             margin-bottom: 15px; 
             box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #10b981;
         }
         .tagihan-history-item h4 { 
             margin-bottom: 10px; 
@@ -1225,7 +1225,7 @@ input, textarea, select {
             }
         }
         .menu-card {
-            background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+            background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
             border: 2px solid #e5e7eb;
             border-radius: 16px;
             padding: 28px 20px;
@@ -1237,10 +1237,10 @@ input, textarea, select {
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
         .menu-card:hover {
-            border-color: #667eea;
-            background: linear-gradient(135deg, #f0f4ff 0%, #ffffff 100%);
+            border-color: #10b981;
+            background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
             transform: translateY(-4px);
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.2);
         }
         .menu-card:active {
             transform: translateY(-2px);
@@ -1253,10 +1253,10 @@ input, textarea, select {
             align-items: center;
             justify-content: center;
             border-radius: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             font-size: 32px;
             line-height: 1;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
         }
         .menu-card:nth-child(1) .menu-icon {
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -1667,7 +1667,7 @@ input, textarea, select {
                     <?php else: ?>
                         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px;">
                             <?php foreach ($barang_list as $barang): ?>
-                                <div style="background: #f7fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea; cursor: pointer;" onclick="addToCart(<?= $barang['id'] ?>, '<?= htmlspecialchars($barang['nama_barang'], ENT_QUOTES) ?>', <?= $barang['harga'] ?>, <?= $barang['stok'] ?>)">
+                                <div style="background: #f7fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981; cursor: pointer;" onclick="addToCart(<?= $barang['id'] ?>, '<?= htmlspecialchars($barang['nama_barang'], ENT_QUOTES) ?>', <?= $barang['harga'] ?>, <?= $barang['stok'] ?>)">
                                     <h4 style="color: #2d3748; margin-bottom: 10px;"><?= htmlspecialchars($barang['nama_barang']) ?></h4>
                                     <p style="color: #4a5568; font-size: 14px; margin: 5px 0;"><?= htmlspecialchars($barang['deskripsi'] ?? '') ?></p>
                                     <p style="margin: 10px 0;"><strong>Harga: Rp <?= number_format($barang['harga'], 0, ',', '.') ?></strong></p>
@@ -1739,7 +1739,7 @@ input, textarea, select {
                             <tbody>
                                 <?php foreach ($vouchers as $voucher): ?>
                                     <tr>
-                                        <td><strong style="font-size: 16px; color: #667eea;"><?= htmlspecialchars($voucher['voucher_code']) ?></strong></td>
+                                        <td><strong style="font-size: 16px; color: #10b981;"><?= htmlspecialchars($voucher['voucher_code']) ?></strong></td>
                                         <td><?= htmlspecialchars($voucher['order_id'] ?? '-') ?></td>
                                         <td>Rp <?= number_format($voucher['total_harga'], 0, ',', '.') ?></td>
                                         <td><?= htmlspecialchars($voucher['daftar_barang'] ?? '-') ?></td>
@@ -1949,7 +1949,7 @@ input, textarea, select {
                 const modalBody = document.getElementById('modal-body');
                 modalBody.innerHTML = `
                     <div style="text-align: center; padding: 40px;">
-                        <div style="border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+                        <div style="border: 4px solid #f3f3f3; border-top: 4px solid #10b981; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
                         <p style="margin-top: 20px; color: #666;">Sedang memproses pembayaran...</p>
                     </div>
                 `;
