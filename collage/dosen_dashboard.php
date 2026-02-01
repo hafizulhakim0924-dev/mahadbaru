@@ -22,6 +22,40 @@ try {
 $message = '';
 $message_type = '';
 
+// Handle AJAX search request
+if (isset($_GET['search']) && $_GET['search'] === 'students') {
+    $search_term = trim($_GET['q'] ?? '');
+    $results = [];
+    
+    if (strlen($search_term) >= 2) {
+        $stmt = $conn->prepare("
+            SELECT id, name, class 
+            FROM students 
+            WHERE name LIKE ? OR class LIKE ?
+            ORDER BY class ASC, name ASC
+            LIMIT 20
+        ");
+        $search_pattern = '%' . $search_term . '%';
+        $stmt->bind_param("ss", $search_pattern, $search_pattern);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        while ($row = $result->fetch_assoc()) {
+            $results[] = [
+                'id' => $row['id'],
+                'name' => $row['name'],
+                'class' => $row['class'],
+                'display' => $row['name'] . ' - ' . $row['class']
+            ];
+        }
+        $stmt->close();
+    }
+    
+    header('Content-Type: application/json');
+    echo json_encode($results);
+    exit;
+}
+
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $student_id = intval($_POST['student_id'] ?? 0);
@@ -29,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $mata_kuliah = trim($_POST['mata_kuliah'] ?? '');
     $status = $_POST['status'] ?? 'hadir';
     $keterangan = trim($_POST['keterangan'] ?? '');
-    $dosen_id = intval($_POST['dosen_id'] ?? 0);
+    $dosen_id = !empty($_POST['dosen_id']) ? intval($_POST['dosen_id']) : null;
     
     if ($student_id > 0 && !empty($mata_kuliah) && !empty($status)) {
         // Check if absensi already exists for this student, date, and mata_kuliah
@@ -49,7 +83,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 SET status = ?, keterangan = ?, dosen_id = ?, updated_at = NOW()
                 WHERE id = ?
             ");
-            $stmt->bind_param("ssii", $status, $keterangan, $dosen_id, $row['id']);
+            if ($dosen_id !== null) {
+                $stmt->bind_param("ssii", $status, $keterangan, $dosen_id, $row['id']);
+            } else {
+                $stmt = $conn->prepare("
+                    UPDATE absensi 
+                    SET status = ?, keterangan = ?, updated_at = NOW()
+                    WHERE id = ?
+                ");
+                $stmt->bind_param("ssi", $status, $keterangan, $row['id']);
+            }
             if ($stmt->execute()) {
                 $message = "Absensi berhasil diperbarui!";
                 $message_type = "success";
@@ -64,7 +107,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 INSERT INTO absensi (student_id, tanggal, mata_kuliah, status, keterangan, dosen_id, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, NOW())
             ");
-            $stmt->bind_param("issssi", $student_id, $tanggal, $mata_kuliah, $status, $keterangan, $dosen_id);
+            if ($dosen_id !== null) {
+                $stmt->bind_param("issssi", $student_id, $tanggal, $mata_kuliah, $status, $keterangan, $dosen_id);
+            } else {
+                $stmt = $conn->prepare("
+                    INSERT INTO absensi (student_id, tanggal, mata_kuliah, status, keterangan, created_at)
+                    VALUES (?, ?, ?, ?, ?, NOW())
+                ");
+                $stmt->bind_param("issss", $student_id, $tanggal, $mata_kuliah, $status, $keterangan);
+            }
             if ($stmt->execute()) {
                 $message = "Absensi berhasil disimpan!";
                 $message_type = "success";
@@ -279,6 +330,86 @@ $stmt->close();
                 grid-template-columns: 1fr;
             }
         }
+        .search-container {
+            position: relative;
+        }
+        .search-input {
+            width: 100%;
+            padding: 12px 40px 12px 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+        .search-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6b7280;
+            pointer-events: none;
+        }
+        .autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .autocomplete-dropdown.show {
+            display: block;
+        }
+        .autocomplete-item {
+            padding: 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background 0.2s;
+        }
+        .autocomplete-item:hover,
+        .autocomplete-item.selected {
+            background: #f0fdf4;
+        }
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+        .autocomplete-item-name {
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+        .autocomplete-item-class {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .selected-student {
+            margin-top: 12px;
+            padding: 12px;
+            background: #f0fdf4;
+            border: 1px solid #10b981;
+            border-radius: 8px;
+            display: none;
+        }
+        .selected-student.show {
+            display: block;
+        }
+        .selected-student-name {
+            font-weight: 600;
+            color: #065f46;
+        }
     </style>
 </head>
 <body>
@@ -299,15 +430,23 @@ $stmt->close();
                 <h2>Input Absensi</h2>
                 <form method="POST">
                     <div class="form-group">
-                        <label for="student_id">Nama Siswa *</label>
-                        <select name="student_id" id="student_id" required>
-                            <option value="">Pilih Siswa</option>
-                            <?php foreach ($students as $student): ?>
-                                <option value="<?= $student['id'] ?>">
-                                    <?= htmlspecialchars($student['name']) ?> - <?= htmlspecialchars($student['class']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                        <label for="student_search">Cari Nama Siswa *</label>
+                        <div class="search-container">
+                            <input 
+                                type="text" 
+                                id="student_search" 
+                                class="search-input" 
+                                placeholder="Ketik nama siswa atau kelas..."
+                                autocomplete="off"
+                                required
+                            >
+                            <span class="search-icon">🔍</span>
+                            <div class="autocomplete-dropdown" id="autocomplete_dropdown"></div>
+                            <input type="hidden" name="student_id" id="student_id" required>
+                        </div>
+                        <div class="selected-student" id="selected_student">
+                            <div class="selected-student-name" id="selected_student_name"></div>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -381,6 +520,140 @@ $stmt->close();
             </div>
         </div>
     </div>
+
+    <script>
+        let searchTimeout;
+        let selectedStudentId = null;
+        let selectedStudentName = null;
+        let currentFocus = -1;
+
+        const studentSearch = document.getElementById('student_search');
+        const studentIdInput = document.getElementById('student_id');
+        const autocompleteDropdown = document.getElementById('autocomplete_dropdown');
+        const selectedStudentDiv = document.getElementById('selected_student');
+        const selectedStudentNameDiv = document.getElementById('selected_student_name');
+
+        studentSearch.addEventListener('input', function() {
+            const query = this.value.trim();
+            
+            clearTimeout(searchTimeout);
+            
+            if (query.length < 2) {
+                autocompleteDropdown.classList.remove('show');
+                selectedStudentDiv.classList.remove('show');
+                studentIdInput.value = '';
+                selectedStudentId = null;
+                return;
+            }
+
+            searchTimeout = setTimeout(() => {
+                searchStudents(query);
+            }, 300);
+        });
+
+        studentSearch.addEventListener('keydown', function(e) {
+            const items = autocompleteDropdown.querySelectorAll('.autocomplete-item');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                currentFocus++;
+                if (currentFocus >= items.length) currentFocus = 0;
+                setActive(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                currentFocus--;
+                if (currentFocus < 0) currentFocus = items.length - 1;
+                setActive(items);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (currentFocus > -1 && items[currentFocus]) {
+                    items[currentFocus].click();
+                }
+            } else if (e.key === 'Escape') {
+                autocompleteDropdown.classList.remove('show');
+                currentFocus = -1;
+            }
+        });
+
+        function setActive(items) {
+            items.forEach(item => item.classList.remove('selected'));
+            if (items[currentFocus]) {
+                items[currentFocus].classList.add('selected');
+                items[currentFocus].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        function searchStudents(query) {
+            fetch(`?search=students&q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    displayResults(data);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function displayResults(results) {
+            autocompleteDropdown.innerHTML = '';
+            currentFocus = -1;
+
+            if (results.length === 0) {
+                autocompleteDropdown.innerHTML = '<div class="autocomplete-item" style="color: #6b7280; cursor: default;">Tidak ada hasil</div>';
+                autocompleteDropdown.classList.add('show');
+                return;
+            }
+
+            results.forEach(result => {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-item';
+                item.innerHTML = `
+                    <div class="autocomplete-item-name">${escapeHtml(result.name)}</div>
+                    <div class="autocomplete-item-class">Kelas: ${escapeHtml(result.class)}</div>
+                `;
+                item.addEventListener('click', () => {
+                    selectStudent(result.id, result.display);
+                });
+                autocompleteDropdown.appendChild(item);
+            });
+
+            autocompleteDropdown.classList.add('show');
+        }
+
+        function selectStudent(id, display) {
+            selectedStudentId = id;
+            selectedStudentName = display;
+            studentIdInput.value = id;
+            studentSearch.value = display;
+            selectedStudentNameDiv.textContent = '✓ Terpilih: ' + display;
+            selectedStudentDiv.classList.add('show');
+            autocompleteDropdown.classList.remove('show');
+            currentFocus = -1;
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.search-container')) {
+                autocompleteDropdown.classList.remove('show');
+                currentFocus = -1;
+            }
+        });
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Clear selection when user starts typing again
+        studentSearch.addEventListener('focus', function() {
+            if (this.value !== selectedStudentName) {
+                selectedStudentDiv.classList.remove('show');
+                studentIdInput.value = '';
+                selectedStudentId = null;
+            }
+        });
+    </script>
 </body>
 </html>
 <?php $conn->close(); ?>
