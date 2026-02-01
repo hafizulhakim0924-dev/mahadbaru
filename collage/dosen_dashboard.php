@@ -190,11 +190,12 @@ while ($row = $result->fetch_assoc()) {
 }
 $stmt->close();
 
-// Get recent absensi
+// Get recent absensi with dosen info
 $stmt = $conn->prepare("
-    SELECT a.*, s.name as student_name, s.class 
+    SELECT a.*, s.name as student_name, s.class, d.nama as dosen_nama
     FROM absensi a
     LEFT JOIN students s ON a.student_id = s.id
+    LEFT JOIN dosen d ON a.dosen_id = d.id
     ORDER BY a.tanggal DESC, a.created_at DESC
     LIMIT 20
 ");
@@ -623,12 +624,20 @@ try {
                                 <?php foreach ($recent_absensi as $abs): ?>
                                     <tr>
                                         <td><?= date('d/m/Y', strtotime($abs['tanggal'])) ?></td>
-                                        <td><?= htmlspecialchars($abs['student_name'] ?? 'N/A') ?></td>
+                                        <td>
+                                            <?= htmlspecialchars($abs['student_name'] ?? 'N/A') ?>
+                                            <?php if (!empty($abs['class'])): ?>
+                                                <br><small style="color: #6b7280;"><?= htmlspecialchars($abs['class']) ?></small>
+                                            <?php endif; ?>
+                                        </td>
                                         <td><?= htmlspecialchars($abs['mata_kuliah']) ?></td>
                                         <td>
                                             <span class="status-badge status-<?= $abs['status'] ?>">
                                                 <?= ucfirst($abs['status']) ?>
                                             </span>
+                                            <?php if (!empty($abs['dosen_nama'])): ?>
+                                                <br><small style="color: #6b7280; font-size: 11px;">Oleh: <?= htmlspecialchars($abs['dosen_nama']) ?></small>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>

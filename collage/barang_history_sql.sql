@@ -2,7 +2,24 @@
 -- TABEL RIWAYAT PENAMBAHAN BARANG
 -- ============================================
 
+-- LANGKAH 1: Pastikan tabel barang sudah ada terlebih dahulu
+-- Jika belum ada, jalankan query di bawah ini:
+
+CREATE TABLE IF NOT EXISTS `barang` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `nama_barang` varchar(255) NOT NULL,
+  `deskripsi` text DEFAULT NULL,
+  `harga` decimal(10,2) NOT NULL,
+  `stok` int(11) NOT NULL DEFAULT 0,
+  `gambar` varchar(255) DEFAULT NULL,
+  `status` enum('aktif','nonaktif') NOT NULL DEFAULT 'aktif',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Tabel untuk menyimpan riwayat penambahan dan perubahan barang
+-- Versi tanpa Foreign Key (lebih aman jika tabel barang belum ada)
 CREATE TABLE IF NOT EXISTS `barang_history` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `barang_id` int(11) NOT NULL,
@@ -15,77 +32,79 @@ CREATE TABLE IF NOT EXISTS `barang_history` (
   PRIMARY KEY (`id`),
   KEY `barang_id` (`barang_id`),
   KEY `created_at` (`created_at`),
-  KEY `action_type` (`action_type`),
-  FOREIGN KEY (`barang_id`) REFERENCES `barang`(`id`) ON DELETE CASCADE
+  KEY `action_type` (`action_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tambahkan Foreign Key setelah tabel dibuat (opsional, untuk referential integrity)
+-- Hapus komentar di bawah ini jika ingin menambahkan Foreign Key constraint
+-- Pastikan tabel barang sudah ada dan menggunakan engine InnoDB
+/*
+ALTER TABLE `barang_history` 
+ADD CONSTRAINT `fk_barang_history_barang_id` 
+FOREIGN KEY (`barang_id`) 
+REFERENCES `barang`(`id`) 
+ON DELETE CASCADE 
+ON UPDATE CASCADE;
+*/
 
 -- ============================================
 -- TRIGGER UNTUK OTOMATIS MENCATAT RIWAYAT
 -- ============================================
+-- CATATAN: Trigger hanya bisa dibuat jika menggunakan command line MySQL atau phpMyAdmin dengan mode yang mendukung DELIMITER
+-- Jika menggunakan phpMyAdmin web interface, buat trigger satu per satu tanpa DELIMITER
 
--- Trigger untuk mencatat ketika barang ditambahkan
-DELIMITER $$
+-- LANGKAH 2: Buat trigger untuk mencatat ketika barang ditambahkan
+-- Hapus trigger jika sudah ada
+DROP TRIGGER IF EXISTS `trg_barang_after_insert`;
+
+-- Buat trigger baru
 CREATE TRIGGER `trg_barang_after_insert` 
 AFTER INSERT ON `barang`
 FOR EACH ROW
-BEGIN
-    INSERT INTO `barang_history` (
-        `barang_id`, 
-        `nama_barang`, 
-        `harga`, 
-        `stok`, 
-        `action_type`, 
-        `created_by`
-    ) VALUES (
-        NEW.id,
-        NEW.nama_barang,
-        NEW.harga,
-        NEW.stok,
-        'added',
-        'system'
-    );
-END$$
-DELIMITER ;
+INSERT INTO `barang_history` (
+    `barang_id`, 
+    `nama_barang`, 
+    `harga`, 
+    `stok`, 
+    `action_type`, 
+    `created_by`
+) VALUES (
+    NEW.id,
+    NEW.nama_barang,
+    NEW.harga,
+    NEW.stok,
+    'added',
+    'system'
+);
 
--- Trigger untuk mencatat ketika barang diupdate
-DELIMITER $$
+-- LANGKAH 3: Buat trigger untuk mencatat ketika barang diupdate
+-- Hapus trigger jika sudah ada
+DROP TRIGGER IF EXISTS `trg_barang_after_update`;
+
+-- Buat trigger baru (versi sederhana tanpa DELIMITER)
+-- Catatan: Trigger ini akan mencatat semua update, termasuk perubahan stok
 CREATE TRIGGER `trg_barang_after_update` 
 AFTER UPDATE ON `barang`
 FOR EACH ROW
-BEGIN
-    -- Cek apakah ada perubahan
-    IF OLD.nama_barang != NEW.nama_barang 
-       OR OLD.harga != NEW.harga 
-       OR OLD.stok != NEW.stok 
-       OR OLD.status != NEW.status THEN
-        
-        -- Tentukan action type berdasarkan perubahan
-        SET @action_type = 'updated';
-        
-        IF OLD.stok < NEW.stok THEN
-            SET @action_type = 'stock_increased';
-        ELSEIF OLD.stok > NEW.stok THEN
-            SET @action_type = 'stock_decreased';
-        END IF;
-        
-        INSERT INTO `barang_history` (
-            `barang_id`, 
-            `nama_barang`, 
-            `harga`, 
-            `stok`, 
-            `action_type`, 
-            `created_by`
-        ) VALUES (
-            NEW.id,
-            NEW.nama_barang,
-            NEW.harga,
-            NEW.stok,
-            @action_type,
-            'system'
-        );
-    END IF;
-END$$
-DELIMITER ;
+INSERT INTO `barang_history` (
+    `barang_id`, 
+    `nama_barang`, 
+    `harga`, 
+    `stok`, 
+    `action_type`, 
+    `created_by`
+) VALUES (
+    NEW.id,
+    NEW.nama_barang,
+    NEW.harga,
+    NEW.stok,
+    CASE 
+        WHEN OLD.stok < NEW.stok THEN 'stock_increased'
+        WHEN OLD.stok > NEW.stok THEN 'stock_decreased'
+        ELSE 'updated'
+    END,
+    'system'
+);
 
 -- ============================================
 -- INDEX UNTUK OPTIMASI QUERY
