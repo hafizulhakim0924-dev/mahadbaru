@@ -141,7 +141,7 @@ function createTripayPayment($amount, $order_id, $customer_name, $customer_email
                 'quantity' => 1
             ]
         ],
-        'return_url' => 'https://ypi-khairaummah.sch.id/profile.php?tab=pending',
+        'return_url' => 'https://ypi-khairaummah.sch.id/profile.php?tab=bayar',
         'expired_time' => (time() + (PAYMENT_EXPIRY_HOURS * 3600)),
         'signature' => $signature,
         'callback_url' => 'https://ypi-khairaummah.sch.id/callback.php'
@@ -1394,9 +1394,6 @@ input, textarea, select {
             <div class="tabs">
                 <a href="?" title="Menu Utama">🏠 <span class="tab-text">Menu</span></a>
                 <a href="?tab=bayar" class="<?= $current_tab == 'bayar' ? 'active' : '' ?>" title="Bayar Tagihan">💳 <span class="tab-text">Bayar</span></a>
-                <a href="?tab=pending" class="<?= $current_tab == 'pending' ? 'active' : '' ?>" title="Status Pembayaran">⏳ <span class="tab-text">Status</span></a>
-                <a href="?tab=tagihan" class="<?= $current_tab == 'tagihan' ? 'active' : '' ?>" title="Status Tagihan">📋 <span class="tab-text">Tagihan</span></a>
-                <a href="?tab=history" class="<?= $current_tab == 'history' ? 'active' : '' ?>" title="Riwayat Pembayaran">📜 <span class="tab-text">Riwayat</span></a>
                 <a href="?tab=absensi" class="<?= $current_tab == 'absensi' ? 'active' : '' ?>" title="Rekap Absensi">✅ <span class="tab-text">Absensi</span></a>
                 <a href="?tab=belanja" class="<?= $current_tab == 'belanja' ? 'active' : '' ?>" title="Belanja Barang">🛒 <span class="tab-text">Belanja</span></a>
                 <a href="?tab=voucher" class="<?= $current_tab == 'voucher' ? 'active' : '' ?>" title="Voucher Pembayaran">🎫 <span class="tab-text">Voucher</span></a>
@@ -1408,193 +1405,156 @@ input, textarea, select {
                 $unpaid_bills = array_filter($student_bills, function($amount) { return $amount > 0; });
                 ?>
                 
-                <?php if (empty($unpaid_bills)): ?>
-                    <div class="empty-state">
-                        <h3>Semua Tagihan Lunas!</h3>
-                        <p>Tidak ada tagihan yang perlu dibayar saat ini.</p>
-                    </div>
-                <?php else: ?>
-                    <form id="payment-form">
-                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
-                        <h3 style="margin-bottom: 20px;">Pilih Tagihan:</h3>
-                        
-                        <?php foreach ($unpaid_bills as $bill => $amount): 
-                            // Get tanggal tagihan ditambahkan dari tagihan_history
-                            $stmt = $conn->prepare("SELECT created_at FROM tagihan_history WHERE student_id = ? AND nama_tagihan = ? ORDER BY created_at ASC LIMIT 1");
-                            $stmt->bind_param("is", $student_id, $bill);
-                            $stmt->execute();
-                            $result = $stmt->get_result();
-                            $history_row = $result->fetch_assoc();
-                            $stmt->close();
-                            
-                            $tanggal_ditambahkan = $history_row ? date('d/m/Y H:i', strtotime($history_row['created_at'])) : null;
-                        ?>
-                            <div class="bill-item" onclick="toggleBill('<?= htmlspecialchars($bill) ?>')">
-                                <label style="cursor: pointer; display: block;">
-                                    <input type="checkbox" name="tagihan[]" value="<?= htmlspecialchars($bill) ?>" 
-                                           onchange="updateTotal()">
-                                    <strong><?= htmlspecialchars($bill) ?></strong>
-                                    <br><small>Jumlah: Rp <?= number_format($amount, 0, ',', '.') ?></small>
-                                    <br><small style="color: #999; font-size: 11px;">
-                                        <?php if ($tanggal_ditambahkan): ?>
-                                            📅 Ditambahkan: <?= $tanggal_ditambahkan ?>
-                                        <?php else: ?>
-                                            📁 Data disimpan di komputer server dan bukti tagihan fisik (Bukti Pembayaran Fisik)
-                                        <?php endif; ?>
-                                    </small>
-                                </label>
-                            </div>
-                        <?php endforeach; ?>
-                        
-                        <div class="form-group">
-                            <label>Metode Pembayaran:</label>
-                            <select name="method" required>
-                                <option value="">Pilih Metode</option>
-                                <?php foreach ($available_methods as $method): ?>
-                                    <option value="<?= $method['code'] ?>"><?= $method['name'] ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        
-                        <div id="total-box" class="total-box" style="display:none;">
-                            <h3>Total: <span id="total-amount">Rp 0</span></h3>
-                        </div>
-                        
-                        <button type="submit" class="btn btn-primary btn-full" id="pay-btn" disabled>Bayar Sekarang</button>
-                    </form>
-                <?php endif; ?>
-                
-            <?php elseif ($current_tab == 'pending'): ?>
                 <?php 
+                // Get pending payments
                 $pending_payments = array_filter($my_payments, function($p) { 
                     return $p['status'] == 'pending' && $p['source'] == 'tripay' && time() < strtotime($p['expired_at']); 
                 });
                 ?>
                 
-                <?php if (empty($pending_payments)): ?>
-                    <div class="empty-state">
-                        <h3>Tidak Ada Pembayaran Menunggu</h3>
-                        <p>Semua pembayaran sudah selesai atau kadaluarsa.</p>
-                    </div>
-                <?php else: ?>
-                    <?php foreach ($pending_payments as $payment): ?>
-                        <div class="payment-item">
-                            <h4>Pembayaran Menunggu</h4>
-                            <p><strong>Tagihan:</strong> <?= htmlspecialchars($payment['tagihan']) ?></p>
-                            <p><strong>Jumlah:</strong> Rp <?= number_format($payment['nominal'], 0, ',', '.') ?></p>
-                            <p><strong>Metode:</strong> <?= htmlspecialchars($payment['method_name']) ?></p>
-                            <p><strong>Berakhir:</strong> <?= date('d/m/Y H:i', strtotime($payment['expired_at'])) ?></p>
+                <!-- Section 1: Bayar Tagihan -->
+                <?php if (!empty($unpaid_bills)): ?>
+                    <div class="card" style="margin-bottom: 16px;">
+                        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1a1a1a;">💳 Bayar Tagihan</h3>
+                        <form id="payment-form">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
                             
-                            <button class="btn btn-primary" onclick="showPaymentDetails('<?= $payment['payment_id'] ?>')">
-                                Lihat Detail Pembayaran
-                            </button>
-                        </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-                
-            <?php elseif ($current_tab == 'tagihan'): ?>
-                <?php if (empty($tagihan_history)): ?>
-                    <div class="empty-state">
-                        <h3>Belum Ada Riwayat Tagihan</h3>
-                        <p>Riwayat penambahan dan perubahan tagihan akan muncul di sini.</p>
-                    </div>
-                <?php else: ?>
-                    <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                        <p style="font-size: 13px; color: #666; margin: 0;">
-                            <strong>Total Riwayat:</strong> <?= count($tagihan_history) ?> perubahan tagihan
-                        </p>
-                    </div>
-                    
-                    <?php foreach ($tagihan_history as $history): ?>
-                        <?php 
-                        $action_type = $history['action_type'] ?? 'updated';
-                        $action_labels = [
-                            'added' => 'Ditambahkan',
-                            'updated' => 'Diperbarui',
-                            'reduced' => 'Dikurangi',
-                            'removed' => 'Dihapus',
-                            'created' => 'Dibuat',
-                            'modified' => 'Dimodifikasi'
-                        ];
-                        $action_label = $action_labels[$action_type] ?? ucfirst($action_type);
-                        
-                        // Determine action class for badge color
-                        $action_class = $action_type;
-                        if (in_array($action_type, ['created', 'added'])) {
-                            $action_class = 'added';
-                        } elseif (in_array($action_type, ['modified', 'updated'])) {
-                            $action_class = 'updated';
-                        }
-                        ?>
-                        <div class="tagihan-history-item">
-                            <h4>
-                                <?= htmlspecialchars($history['nama_tagihan']) ?>
-                                <span class="history-action-badge action-<?= $action_class ?>">
-                                    <?= $action_label ?>
-                                </span>
-                            </h4>
+                            <?php foreach ($unpaid_bills as $bill => $amount): 
+                                $stmt = $conn->prepare("SELECT created_at FROM tagihan_history WHERE student_id = ? AND nama_tagihan = ? ORDER BY created_at ASC LIMIT 1");
+                                $stmt->bind_param("is", $student_id, $bill);
+                                $stmt->execute();
+                                $result = $stmt->get_result();
+                                $history_row = $result->fetch_assoc();
+                                $stmt->close();
+                                $tanggal_ditambahkan = $history_row ? date('d/m/Y H:i', strtotime($history_row['created_at'])) : null;
+                            ?>
+                                <div class="bill-item" onclick="toggleBill('<?= htmlspecialchars($bill) ?>')">
+                                    <label style="cursor: pointer; display: block;">
+                                        <input type="checkbox" name="tagihan[]" value="<?= htmlspecialchars($bill) ?>" onchange="updateTotal()">
+                                        <strong><?= htmlspecialchars($bill) ?></strong>
+                                        <br><small>Jumlah: Rp <?= number_format($amount, 0, ',', '.') ?></small>
+                                    </label>
+                                </div>
+                            <?php endforeach; ?>
                             
-                            <div class="history-detail">
-                                <strong>Jumlah:</strong> 
-                                Rp <?= number_format($history['jumlah'], 0, ',', '.') ?>
+                            <div class="form-group">
+                                <label>Metode Pembayaran:</label>
+                                <select name="method" required>
+                                    <option value="">Pilih Metode</option>
+                                    <?php foreach ($available_methods as $method): ?>
+                                        <option value="<?= $method['code'] ?>"><?= $method['name'] ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                             
-                            <div class="history-timestamp">
-                                📅 <?= date('d/m/Y H:i:s', strtotime($history['created_at'])) ?>
+                            <div id="total-box" class="total-box" style="display:none;">
+                                <h3>Total: <span id="total-amount">Rp 0</span></h3>
                             </div>
-                        </div>
-                    <?php endforeach; ?>
+                            
+                            <button type="submit" class="btn btn-primary btn-full" id="pay-btn" disabled>Bayar Sekarang</button>
+                        </form>
+                    </div>
                 <?php endif; ?>
                 
-            <?php elseif ($current_tab == 'history'): ?>
-                <?php if (empty($my_payments)): ?>
-                    <div class="empty-state">
-                        <h3>Belum Ada Riwayat</h3>
-                        <p>Riwayat pembayaran akan muncul di sini.</p>
-                    </div>
-                <?php else: ?>
-                    <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                        <p style="font-size: 13px; color: #666; margin: 0;">
-                            <strong>Total Riwayat:</strong> <?= count($my_payments) ?> pembayaran
-                        </p>
-                    </div>
-                    
-                    <table>
-                        <tr>
-                            <th>Tanggal</th>
-                            <th>Tagihan</th>
-                            <th>Jumlah</th>
-                            <th>Status</th>
-                            <th>Aksi</th>
-                        </tr>
-                        <?php foreach ($my_payments as $payment): ?>
-                            <tr>
-                                <td><?= date('d/m/Y', strtotime($payment['waktu_input'])) ?></td>
-                                <td><?= htmlspecialchars($payment['tagihan']) ?></td>
-                                <td>Rp <?= number_format($payment['nominal'], 0, ',', '.') ?></td>
-                                <td>
-                                    <span class="status-<?= $payment['status'] ?>">
-                                        <?php 
-                                        switch($payment['status']) {
-                                            case 'berhasil': echo 'LUNAS'; break;
-                                            case 'pending': echo 'MENUNGGU'; break;
-                                            default: echo 'GAGAL';
-                                        }
-                                        ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <?php if ($payment['status'] == 'berhasil'): ?>
-                                        <button onclick="showReceipt('<?= htmlspecialchars($payment['payment_id']) ?>')" class="btn btn-primary btn-small">📄 Cetak</button>
-                                    <?php elseif ($payment['status'] == 'pending' && $payment['source'] == 'tripay'): ?>
-                                        <button onclick="showPaymentDetails('<?= htmlspecialchars($payment['payment_id']) ?>')" class="btn btn-primary btn-small">👁️ Lihat</button>
-                                    <?php else: ?>
-                                        <span style="font-size: 12px; color: #999;">-</span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
+                <!-- Section 2: Status Pembayaran Menunggu -->
+                <?php if (!empty($pending_payments)): ?>
+                    <div class="card" style="margin-bottom: 16px;">
+                        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1a1a1a;">⏳ Status Pembayaran</h3>
+                        <?php foreach ($pending_payments as $payment): ?>
+                            <div class="payment-item" style="margin-bottom: 12px; padding: 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;">
+                                <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #92400e;">Pembayaran Menunggu</div>
+                                <div style="font-size: 13px; margin-bottom: 4px;"><strong>Tagihan:</strong> <?= htmlspecialchars($payment['tagihan']) ?></div>
+                                <div style="font-size: 13px; margin-bottom: 4px;"><strong>Jumlah:</strong> Rp <?= number_format($payment['nominal'], 0, ',', '.') ?></div>
+                                <div style="font-size: 13px; margin-bottom: 4px;"><strong>Metode:</strong> <?= htmlspecialchars($payment['method_name']) ?></div>
+                                <div style="font-size: 13px; margin-bottom: 12px;"><strong>Berakhir:</strong> <?= date('d/m/Y H:i', strtotime($payment['expired_at'])) ?></div>
+                                <button class="btn btn-primary btn-small" onclick="showPaymentDetails('<?= $payment['payment_id'] ?>')">Lihat Detail</button>
+                            </div>
                         <?php endforeach; ?>
-                    </table>
+                    </div>
+                <?php endif; ?>
+                
+                <!-- Section 3: Riwayat Tagihan -->
+                <?php if (!empty($tagihan_history)): ?>
+                    <div class="card" style="margin-bottom: 16px;">
+                        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1a1a1a;">📋 Riwayat Tagihan</h3>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <?php foreach ($tagihan_history as $history): ?>
+                                <?php 
+                                $action_type = $history['action_type'] ?? 'updated';
+                                $action_labels = [
+                                    'added' => 'Ditambahkan', 'updated' => 'Diperbarui', 'reduced' => 'Dikurangi',
+                                    'removed' => 'Dihapus', 'created' => 'Dibuat', 'modified' => 'Dimodifikasi'
+                                ];
+                                $action_label = $action_labels[$action_type] ?? ucfirst($action_type);
+                                $action_class = in_array($action_type, ['created', 'added']) ? 'added' : (in_array($action_type, ['modified', 'updated']) ? 'updated' : $action_type);
+                                ?>
+                                <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                        <div style="font-size: 14px; font-weight: 600; color: #1a1a1a;"><?= htmlspecialchars($history['nama_tagihan']) ?></div>
+                                        <span class="history-action-badge action-<?= $action_class ?>" style="font-size: 11px; padding: 3px 8px; border-radius: 12px;">
+                                            <?= $action_label ?>
+                                        </span>
+                                    </div>
+                                    <div style="font-size: 13px; color: #6b7280; margin-bottom: 4px;">
+                                        Rp <?= number_format($history['jumlah'], 0, ',', '.') ?>
+                                    </div>
+                                    <div style="font-size: 11px; color: #9ca3af;">
+                                        <?= date('d/m/Y H:i', strtotime($history['created_at'])) ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                
+                <!-- Section 4: Riwayat Pembayaran -->
+                <?php if (!empty($my_payments)): ?>
+                    <div class="card" style="margin-bottom: 16px;">
+                        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1a1a1a;">📜 Riwayat Pembayaran</h3>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <?php foreach ($my_payments as $payment): ?>
+                                <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                                        <div style="flex: 1;">
+                                            <div style="font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">
+                                                <?= htmlspecialchars($payment['tagihan']) ?>
+                                            </div>
+                                            <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">
+                                                <?= date('d/m/Y', strtotime($payment['waktu_input'])) ?>
+                                            </div>
+                                            <div style="font-size: 13px; font-weight: 600; color: #1a1a1a;">
+                                                Rp <?= number_format($payment['nominal'], 0, ',', '.') ?>
+                                            </div>
+                                        </div>
+                                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+                                            <span class="status-<?= $payment['status'] ?>" style="font-size: 11px; padding: 4px 10px; border-radius: 12px;">
+                                                <?php 
+                                                switch($payment['status']) {
+                                                    case 'berhasil': echo 'LUNAS'; break;
+                                                    case 'pending': echo 'MENUNGGU'; break;
+                                                    default: echo 'GAGAL';
+                                                }
+                                                ?>
+                                            </span>
+                                            <?php if ($payment['status'] == 'berhasil'): ?>
+                                                <button onclick="showReceipt('<?= htmlspecialchars($payment['payment_id']) ?>')" class="btn btn-primary btn-small" style="font-size: 11px; padding: 4px 10px;">Cetak</button>
+                                            <?php elseif ($payment['status'] == 'pending' && $payment['source'] == 'tripay'): ?>
+                                                <button onclick="showPaymentDetails('<?= htmlspecialchars($payment['payment_id']) ?>')" class="btn btn-primary btn-small" style="font-size: 11px; padding: 4px 10px;">Lihat</button>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                
+                <!-- Empty State jika semua kosong -->
+                <?php if (empty($unpaid_bills) && empty($pending_payments) && empty($tagihan_history) && empty($my_payments)): ?>
+                    <div class="empty-state">
+                        <h3>Semua Tagihan Lunas!</h3>
+                        <p>Tidak ada tagihan yang perlu dibayar saat ini.</p>
+                    </div>
                 <?php endif; ?>
             <?php elseif ($current_tab == 'absensi'): ?>
                 <?php
@@ -2501,7 +2461,7 @@ input, textarea, select {
             const urlParams = new URLSearchParams(window.location.search);
             const currentTab = urlParams.get('tab');
             
-            if (currentTab === 'pending') {
+            if (currentTab === 'bayar') {
                 // Jika ada pending payment, cek otomatis setelah 2 detik
                 setTimeout(() => {
                     const firstPendingBtn = document.querySelector('.payment-item .btn-primary');
