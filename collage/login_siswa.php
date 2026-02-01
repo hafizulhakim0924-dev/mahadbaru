@@ -399,37 +399,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <h1 class="title">Mahad Ibnu Zubair</h1>
         <p class="subtitle">Portal Siswa</p>
 
-        <?php if(empty($action)): ?>
-            <!-- Halaman Pilihan Menu -->
-            <div class="menu-grid">
-                <a href="?action=bayar" class="menu-card">
-                    <div class="menu-icon">💳</div>
-                    <div class="menu-title">Bayar Tagihan</div>
-                </a>
-                <a href="?action=belanja" class="menu-card">
-                    <div class="menu-icon">📚</div>
-                    <div class="menu-title">Beli Buku</div>
-                </a>
-                <a href="?action=voucher" class="menu-card">
-                    <div class="menu-icon">🎫</div>
-                    <div class="menu-title">Claim Voucher</div>
-                </a>
-                <a href="?action=absensi" class="menu-card">
-                    <div class="menu-icon">✅</div>
-                    <div class="menu-title">Absensi</div>
-                </a>
-            </div>
-        <?php else: ?>
-            <!-- Halaman Login -->
-            <?php if(!empty($device_id)): ?>
-            <div class="info new">
-                Login dari aplikasi mobile
-            </div>
-            <?php endif; ?>
+        <!-- Halaman Login -->
+        <?php if(!empty($device_id)): ?>
+        <div class="info new">
+            Login dari aplikasi mobile
+        </div>
+        <?php endif; ?>
 
-            <a href="?" class="back-btn">← Kembali ke pilihan</a>
-
-            <form method="POST" id="loginForm">
+        <form method="POST" id="loginForm">
             <input 
                 type="text" 
                 name="student_id" 
@@ -448,26 +425,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 autocomplete="current-password"
             >
             
-                <!-- HIDDEN FIELDS untuk device_id dan token dari app -->
-                <?php if(!empty($device_id)): ?>
-                <input type="hidden" name="device_id" value="<?= htmlspecialchars($device_id) ?>">
-                <input type="hidden" name="token" value="<?= htmlspecialchars($fcm_token) ?>">
-                <?php endif; ?>
-                
-                <!-- HIDDEN FIELD untuk action -->
-                <input type="hidden" name="action" value="<?= htmlspecialchars($action) ?>">
-                
-                <button type="submit" class="btn">Masuk</button>
-            </form>
-
-            <?php if($error): ?>
-            <div class="error"><?= htmlspecialchars($error) ?></div>
+            <!-- HIDDEN FIELDS untuk device_id dan token dari app -->
+            <?php if(!empty($device_id)): ?>
+            <input type="hidden" name="device_id" value="<?= htmlspecialchars($device_id) ?>">
+            <input type="hidden" name="token" value="<?= htmlspecialchars($fcm_token) ?>">
             <?php endif; ?>
+            
+            <button type="submit" class="btn">Masuk</button>
+        </form>
 
-            <div class="divider"><span>atau</span></div>
-            <a href="register_siswa.php" class="btn2 primary">Daftar Akun Baru</a>
-            <a href="change_password.php" class="btn2">Ubah Password</a>
+        <?php if($error): ?>
+        <div class="error"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
+
+        <div class="divider"><span>atau</span></div>
+        <a href="register_siswa.php" class="btn2 primary">Daftar Akun Baru</a>
+        <a href="change_password.php" class="btn2">Ubah Password</a>
     </div>
 
     <script>

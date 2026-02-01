@@ -1217,76 +1217,110 @@ input, textarea, select {
         /* Menu Grid Styles */
         .menu-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            padding: 20px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            padding: 24px 20px;
+            max-width: 100%;
         }
         @media (max-width: 480px) {
             .menu-grid {
                 grid-template-columns: 1fr;
-                gap: 12px;
+                gap: 16px;
+                padding: 20px 16px;
             }
         }
         .menu-card {
-            background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+            background: #ffffff;
             border: 2px solid #e5e7eb;
-            border-radius: 16px;
-            padding: 28px 20px;
+            border-radius: 20px;
+            padding: 32px 20px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             text-decoration: none;
-            display: block;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            position: relative;
+            overflow: hidden;
+        }
+        .menu-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+            transform: scaleX(0);
+            transition: transform 0.3s;
         }
         .menu-card:hover {
             border-color: #10b981;
-            background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
-            transform: translateY(-4px);
-            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.2);
+            background: #f0fdf4;
+            transform: translateY(-6px);
+            box-shadow: 0 12px 24px rgba(16, 185, 129, 0.15);
+        }
+        .menu-card:hover::before {
+            transform: scaleX(1);
         }
         .menu-card:active {
-            transform: translateY(-2px);
+            transform: translateY(-3px);
         }
         .menu-icon {
-            width: 64px;
-            height: 64px;
-            margin: 0 auto 16px;
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 16px;
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            font-size: 32px;
-            line-height: 1;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+            border-radius: 20px;
+            background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
+            transition: all 0.3s;
+        }
+        .menu-card:hover .menu-icon {
+            transform: scale(1.1);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
         }
         .menu-card:nth-child(1) .menu-icon {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+            background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
         }
         .menu-card:nth-child(2) .menu-icon {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
+        }
+        .menu-card:nth-child(2):hover .menu-icon {
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
         }
         .menu-card:nth-child(3) .menu-icon {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+            background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+            box-shadow: 0 6px 16px rgba(245, 158, 11, 0.3);
+        }
+        .menu-card:nth-child(3):hover .menu-icon {
+            box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4);
         }
         .menu-card:nth-child(4) .menu-icon {
-            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+            background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+            box-shadow: 0 6px 16px rgba(139, 92, 246, 0.3);
+        }
+        .menu-card:nth-child(4):hover .menu-icon {
+            box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4);
         }
         .menu-title {
-            font-size: 15px;
-            font-weight: 600;
+            font-size: 16px;
+            font-weight: 700;
             color: #1a1a1a;
-            margin: 0;
+            margin: 0 0 8px 0;
+            letter-spacing: -0.3px;
         }
         .menu-subtitle {
-            font-size: 12px;
+            font-size: 13px;
             color: #6b7280;
-            margin-top: 6px;
+            margin: 0;
+            line-height: 1.4;
         }
     </style>
 </head>
@@ -1304,7 +1338,11 @@ input, textarea, select {
 
         <?php if ($show_menu): ?>
             <!-- Halaman Pilihan Menu -->
-            <div class="content">
+            <div class="content" style="padding: 0;">
+                <div style="padding: 24px 20px 0; text-align: center;">
+                    <h2 style="font-size: 20px; font-weight: 700; color: #1a1a1a; margin-bottom: 8px;">Pilih Menu</h2>
+                    <p style="font-size: 14px; color: #6b7280; margin-bottom: 0;">Silakan pilih menu yang ingin Anda akses</p>
+                </div>
                 <div class="menu-grid">
                     <a href="?tab=bayar" class="menu-card">
                         <div class="menu-icon">
