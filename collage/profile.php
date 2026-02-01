@@ -1616,61 +1616,14 @@ input, textarea, select {
                 $stmt->close();
                 ?>
                 
-                <div class="card">
-                    <h2 style="margin-bottom: 20px;">Rekap Absensi</h2>
+                <div class="card" style="padding: 16px;">
+                    <h2 style="margin-bottom: 12px; font-size: 16px; font-weight: 600;">Rekap Absensi</h2>
                     <?php if (empty($absensi_data)): ?>
-                        <div class="empty-state">
-                            <h3>Belum Ada Data Absensi</h3>
-                            <p>Data absensi akan muncul setelah dosen menginput kehadiran Anda.</p>
+                        <div class="empty-state" style="padding: 30px 20px;">
+                            <h3 style="font-size: 14px;">Belum Ada Data Absensi</h3>
+                            <p style="font-size: 13px;">Data absensi akan muncul setelah dosen menginput kehadiran Anda.</p>
                         </div>
                     <?php else: ?>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Tanggal</th>
-                                    <th>Mata Kuliah</th>
-                                    <th>Status</th>
-                                    <th>Dosen</th>
-                                    <th>Keterangan</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($absensi_data as $abs): ?>
-                                    <tr>
-                                        <td><?= date('d/m/Y', strtotime($abs['tanggal'])) ?></td>
-                                        <td><?= htmlspecialchars($abs['mata_kuliah']) ?></td>
-                                        <td>
-                                            <?php
-                                            $status_class = '';
-                                            $status_text = '';
-                                            switch($abs['status']) {
-                                                case 'hadir':
-                                                    $status_class = 'status-berhasil';
-                                                    $status_text = 'Hadir';
-                                                    break;
-                                                case 'izin':
-                                                    $status_class = 'status-pending';
-                                                    $status_text = 'Izin';
-                                                    break;
-                                                case 'sakit':
-                                                    $status_class = 'status-pending';
-                                                    $status_text = 'Sakit';
-                                                    break;
-                                                case 'alpha':
-                                                    $status_class = 'status-pending';
-                                                    $status_text = 'Alpha';
-                                                    break;
-                                            }
-                                            ?>
-                                            <span class="<?= $status_class ?>"><?= $status_text ?></span>
-                                        </td>
-                                        <td><?= htmlspecialchars($abs['nama_dosen'] ?? 'N/A') ?></td>
-                                        <td><?= htmlspecialchars($abs['keterangan'] ?? '-') ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                        
                         <?php
                         // Calculate statistics
                         $total = count($absensi_data);
@@ -1680,10 +1633,75 @@ input, textarea, select {
                         $alpha = count(array_filter($absensi_data, fn($a) => $a['status'] == 'alpha'));
                         $persentase = $total > 0 ? round(($hadir / $total) * 100, 2) : 0;
                         ?>
-                        <div class="total-box" style="margin-top: 20px;">
-                            <h3>Statistik Kehadiran</h3>
-                            <p style="margin: 10px 0;">Total: <?= $total ?> | Hadir: <?= $hadir ?> | Izin: <?= $izin ?> | Sakit: <?= $sakit ?> | Alpha: <?= $alpha ?></p>
-                            <p style="font-size: 20px; margin-top: 10px;"><strong>Persentase Kehadiran: <?= $persentase ?>%</strong></p>
+                        
+                        <!-- Statistik Ringkas -->
+                        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: 700; margin-bottom: 4px;"><?= $persentase ?>%</div>
+                            <div style="font-size: 11px; opacity: 0.9;">Kehadiran</div>
+                            <div style="display: flex; justify-content: space-around; margin-top: 8px; font-size: 11px; opacity: 0.9;">
+                                <span>Hadir: <?= $hadir ?></span>
+                                <span>Izin: <?= $izin ?></span>
+                                <span>Sakit: <?= $sakit ?></span>
+                                <span>Alpha: <?= $alpha ?></span>
+                            </div>
+                        </div>
+                        
+                        <!-- List Absensi -->
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <?php foreach ($absensi_data as $abs): ?>
+                                <?php
+                                $status_class = '';
+                                $status_text = '';
+                                $status_color = '';
+                                switch($abs['status']) {
+                                    case 'hadir':
+                                        $status_class = 'status-berhasil';
+                                        $status_text = 'Hadir';
+                                        $status_color = '#10b981';
+                                        break;
+                                    case 'izin':
+                                        $status_class = 'status-pending';
+                                        $status_text = 'Izin';
+                                        $status_color = '#f59e0b';
+                                        break;
+                                    case 'sakit':
+                                        $status_class = 'status-pending';
+                                        $status_text = 'Sakit';
+                                        $status_color = '#3b82f6';
+                                        break;
+                                    case 'alpha':
+                                        $status_class = 'status-pending';
+                                        $status_text = 'Alpha';
+                                        $status_color = '#ef4444';
+                                        break;
+                                }
+                                ?>
+                                <div style="background: #ffffff; border: 1px solid #e5e7eb; border-left: 3px solid <?= $status_color ?>; border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                                            <span style="display: inline-block; padding: 3px 8px; background: <?= $status_color == '#10b981' ? '#d1fae5' : ($status_color == '#f59e0b' ? '#fef3c7' : ($status_color == '#3b82f6' ? '#dbeafe' : '#fee2e2')) ?>; color: <?= $status_color ?>; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                                                <?= $status_text ?>
+                                            </span>
+                                            <span style="font-size: 12px; color: #6b7280;">
+                                                <?= date('d/m/Y', strtotime($abs['tanggal'])) ?>
+                                            </span>
+                                        </div>
+                                        <div style="font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">
+                                            <?= htmlspecialchars($abs['mata_kuliah']) ?>
+                                        </div>
+                                        <?php if (!empty($abs['keterangan'])): ?>
+                                            <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+                                                <?= htmlspecialchars($abs['keterangan']) ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <?php if (!empty($abs['nama_dosen'])): ?>
+                                            <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">
+                                                Dosen: <?= htmlspecialchars($abs['nama_dosen']) ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
                 </div>
