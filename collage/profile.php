@@ -988,11 +988,14 @@ input, textarea, select {
         .form-group { margin-bottom: 20px; }
         .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
         .form-group select { width: 100%; padding: 12px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 16px; background: white; }
-        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; text-decoration: none; display: inline-block; text-align: center; transition: all 0.3s; }
-        .btn-primary { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+        .btn { width: auto; min-width: 44px; height: 44px; padding: 10px 16px; border: none; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; transition: all 0.3s; gap: 6px; }
+        .btn-primary { background: linear-gradient(135deg, #10b981 0%, #34d399 100%); color: white; }
         .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4); }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-small { width: auto; padding: 8px 16px; font-size: 12px; margin: 5px; display: inline-block; }
+        .btn-small { min-width: 36px; height: 36px; padding: 6px 12px; font-size: 12px; margin: 4px; display: inline-flex; }
+        .btn-full { width: 100%; }
+        .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; }
+        .btn-danger:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4); }
         .total-box { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px; border-radius: 12px; margin: 20px 0; text-align: center; }
         .total-box h3 { font-size: 24px; }
         .empty-state { text-align: center; padding: 60px 20px; color: #6c757d; }
@@ -1415,7 +1418,7 @@ input, textarea, select {
                             <h3>Total: <span id="total-amount">Rp 0</span></h3>
                         </div>
                         
-                        <button type="submit" class="btn btn-primary" id="pay-btn" disabled>Bayar Sekarang</button>
+                        <button type="submit" class="btn btn-primary btn-full" id="pay-btn" disabled>Bayar Sekarang</button>
                     </form>
                 <?php endif; ?>
                 
@@ -1672,7 +1675,7 @@ input, textarea, select {
                                     <p style="color: #4a5568; font-size: 14px; margin: 5px 0;"><?= htmlspecialchars($barang['deskripsi'] ?? '') ?></p>
                                     <p style="margin: 10px 0;"><strong>Harga: Rp <?= number_format($barang['harga'], 0, ',', '.') ?></strong></p>
                                     <p style="font-size: 12px; color: #666;">Stok: <?= $barang['stok'] ?> unit</p>
-                                    <button class="btn btn-primary btn-small" style="margin-top: 10px; width: 100%;">Tambah ke Keranjang</button>
+                                    <button class="btn btn-primary btn-small btn-full" style="margin-top: 10px;">Tambah ke Keranjang</button>
                                 </div>
                             <?php endforeach; ?>
                         </div>
@@ -1682,7 +1685,7 @@ input, textarea, select {
                                 <h2>Keranjang Belanja</h2>
                                 <div id="cart-items"></div>
                                 <div id="cart-total" style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-top: 20px; text-align: right;"></div>
-                                <button class="btn btn-primary" onclick="checkout()" style="margin-top: 20px;">Checkout</button>
+                                <button class="btn btn-primary btn-full" onclick="checkout()" style="margin-top: 20px;">Checkout</button>
                             </div>
                         </div>
                     <?php endif; ?>
@@ -1794,7 +1797,7 @@ input, textarea, select {
             </div>
             <div style="padding: 20px; text-align: center; border-top: 1px solid #e9ecef;">
                 <button class="btn btn-primary" onclick="printReceipt()" style="margin-right: 10px;">🖨️ Cetak</button>
-                <button class="btn" onclick="closeReceiptModal()" style="background: #6c757d; color: white;">Tutup</button>
+                <button class="btn btn-primary" onclick="closeReceiptModal()">Tutup</button>
             </div>
         </div>
     </div>
@@ -2048,7 +2051,7 @@ input, textarea, select {
 
             if (payment.pay_url) {
                 content += `
-                    <a href="${payment.pay_url}" target="_blank" class="btn btn-primary" style="margin: 10px 0; display: inline-block;">
+                    <a href="${payment.pay_url}" target="_blank" class="btn btn-primary btn-full" style="margin: 10px 0;">
                         Bayar Sekarang
                     </a>
                 `;
@@ -2083,7 +2086,7 @@ input, textarea, select {
 
             if (payment.status === 'pending') {
                 content += `
-                    <button class="btn btn-primary" onclick="checkPaymentStatus('${payment.payment_id}')" style="margin-top: 15px;">
+                    <button class="btn btn-primary btn-full" onclick="checkPaymentStatus('${payment.payment_id}')" style="margin-top: 15px;">
                         Periksa Status Manual
                     </button>
                 `;
@@ -2464,12 +2467,12 @@ input, textarea, select {
                         <td style="padding: 12px 8px; border: 1px solid #e9ecef;">${item.nama}</td>
                         <td style="padding: 12px 8px; border: 1px solid #e9ecef;">Rp ${item.harga.toLocaleString('id-ID')}</td>
                         <td style="padding: 12px 8px; border: 1px solid #e9ecef;">
-                            <button class="btn btn-small" onclick="updateQuantity(${item.id}, -1)" style="padding: 5px 10px; font-size: 12px;">-</button>
+                            <button class="btn btn-primary btn-small" onclick="updateQuantity(${item.id}, -1)">-</button>
                             ${item.jumlah}
-                            <button class="btn btn-small" onclick="updateQuantity(${item.id}, 1)" style="padding: 5px 10px; font-size: 12px;">+</button>
+                            <button class="btn btn-primary btn-small" onclick="updateQuantity(${item.id}, 1)">+</button>
                         </td>
                         <td style="padding: 12px 8px; border: 1px solid #e9ecef;">Rp ${subtotal.toLocaleString('id-ID')}</td>
-                        <td style="padding: 12px 8px; border: 1px solid #e9ecef;"><button class="btn btn-danger btn-small" onclick="removeFromCart(${item.id})" style="padding: 5px 10px; font-size: 12px;">Hapus</button></td>
+                        <td style="padding: 12px 8px; border: 1px solid #e9ecef;"><button class="btn btn-danger btn-small" onclick="removeFromCart(${item.id})">Hapus</button></td>
                     </tr>
                 `;
             });
