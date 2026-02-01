@@ -58,14 +58,61 @@ if (isset($_GET['search']) && $_GET['search'] === 'students') {
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $student_id = intval($_POST['student_id'] ?? 0);
-    $tanggal = $_POST['tanggal'] ?? date('Y-m-d');
-    $mata_kuliah = trim($_POST['mata_kuliah'] ?? '');
-    $status = $_POST['status'] ?? 'hadir';
-    $keterangan = trim($_POST['keterangan'] ?? '');
-    $dosen_id = !empty($_POST['dosen_id']) ? intval($_POST['dosen_id']) : null;
+    // Handle input barang
+    if (isset($_POST['action']) && $_POST['action'] == 'tambah_barang') {
+        $nama_barang = trim($_POST['nama_barang'] ?? '');
+        $deskripsi = trim($_POST['deskripsi'] ?? '');
+        $harga = floatval($_POST['harga'] ?? 0);
+        $stok = intval($_POST['stok'] ?? 0);
+        $status = $_POST['status'] ?? 'aktif';
+        
+        if (!empty($nama_barang) && $harga > 0 && $stok >= 0) {
+            $stmt = $conn->prepare("
+                INSERT INTO barang (nama_barang, deskripsi, harga, stok, status, created_at)
+                VALUES (?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->bind_param("ssdis", $nama_barang, $deskripsi, $harga, $stok, $status);
+            
+            if ($stmt->execute()) {
+                $barang_id = $conn->insert_id;
+                
+                // Simpan riwayat penambahan barang (with error handling)
+                try {
+                    $stmt_history = $conn->prepare("
+                        INSERT INTO barang_history (barang_id, nama_barang, harga, stok, action_type, created_by, created_at)
+                        VALUES (?, ?, ?, ?, 'added', 'dosen', NOW())
+                    ");
+                    if ($stmt_history) {
+                        $stmt_history->bind_param("isdi", $barang_id, $nama_barang, $harga, $stok);
+                        $stmt_history->execute();
+                        $stmt_history->close();
+                    }
+                } catch (Exception $e) {
+                    // Table doesn't exist yet, but barang is still saved
+                }
+                
+                $message = "Barang berhasil ditambahkan!";
+                $message_type = "success";
+            } else {
+                $message = "Gagal menambahkan barang: " . $stmt->error;
+                $message_type = "error";
+            }
+            $stmt->close();
+        } else {
+            $message = "Mohon lengkapi semua field yang wajib!";
+            $message_type = "error";
+        }
+    }
+    // Handle input absensi
+    elseif (isset($_POST['action']) && $_POST['action'] == 'input_absensi') {
+        $student_id = intval($_POST['student_id'] ?? 0);
+        $tanggal = $_POST['tanggal'] ?? date('Y-m-d');
+        $mata_kuliah = trim($_POST['mata_kuliah'] ?? '');
+        $status = $_POST['status'] ?? 'hadir';
+        $keterangan = trim($_POST['keterangan'] ?? '');
+        $dosen_id = !empty($_POST['dosen_id']) ? intval($_POST['dosen_id']) : null;
     
-    if ($student_id > 0 && !empty($mata_kuliah) && !empty($status)) {
+        if ($student_id > 0 && !empty($mata_kuliah) && !empty($status)) {
         // Check if absensi already exists for this student, date, and mata_kuliah
         $stmt_check = $conn->prepare("
             SELECT id FROM absensi 
@@ -126,9 +173,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->close();
         }
         $stmt_check->close();
-    } else {
-        $message = "Mohon lengkapi semua field yang wajib!";
-        $message_type = "error";
+        } else {
+            $message = "Mohon lengkapi semua field yang wajib!";
+            $message_type = "error";
+        }
     }
 }
 
@@ -157,6 +205,39 @@ while ($row = $result->fetch_assoc()) {
     $recent_absensi[] = $row;
 }
 $stmt->close();
+
+// Get all barang
+$stmt = $conn->prepare("SELECT * FROM barang ORDER BY created_at DESC");
+$stmt->execute();
+$result = $stmt->get_result();
+$barang_list = [];
+while ($row = $result->fetch_assoc()) {
+    $barang_list[] = $row;
+}
+$stmt->close();
+
+// Get barang history (with error handling if table doesn't exist)
+$barang_history = [];
+try {
+    $stmt = $conn->prepare("
+        SELECT bh.*, b.nama_barang as current_nama, b.harga as current_harga, b.stok as current_stok
+        FROM barang_history bh
+        LEFT JOIN barang b ON bh.barang_id = b.id
+        ORDER BY bh.created_at DESC
+        LIMIT 30
+    ");
+    if ($stmt) {
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $barang_history[] = $row;
+        }
+        $stmt->close();
+    }
+} catch (Exception $e) {
+    // Table doesn't exist yet, will be empty
+    $barang_history = [];
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -479,7 +560,45 @@ $stmt->close();
                         <input type="number" name="dosen_id" id="dosen_id" placeholder="Kosongkan jika tidak ada" min="0">
                     </div>
 
+                    <input type="hidden" name="action" value="input_absensi">
                     <button type="submit" class="btn btn-primary btn-full">Simpan Absensi</button>
+                </form>
+            </div>
+            
+            <div class="card">
+                <h2>Input Barang</h2>
+                <form method="POST">
+                    <input type="hidden" name="action" value="tambah_barang">
+                    
+                    <div class="form-group">
+                        <label for="nama_barang">Nama Barang *</label>
+                        <input type="text" name="nama_barang" id="nama_barang" placeholder="Contoh: Buku Tulis, Pensil" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="deskripsi">Deskripsi</label>
+                        <textarea name="deskripsi" id="deskripsi" placeholder="Opsional: Deskripsi barang" rows="2"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="harga">Harga (Rp) *</label>
+                        <input type="number" name="harga" id="harga" placeholder="0" min="0" step="100" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="stok">Stok *</label>
+                        <input type="number" name="stok" id="stok" placeholder="0" min="0" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="status_barang">Status</label>
+                        <select name="status" id="status_barang" required>
+                            <option value="aktif">Aktif</option>
+                            <option value="nonaktif">Nonaktif</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full">Tambah Barang</button>
                 </form>
             </div>
 
@@ -518,6 +637,43 @@ $stmt->close();
                     </div>
                 <?php endif; ?>
             </div>
+        </div>
+        
+        <!-- Section Riwayat Barang -->
+        <div class="card" style="margin-top: 20px;">
+            <h2>Riwayat Penambahan Barang</h2>
+            <?php if (empty($barang_history)): ?>
+                <div class="empty-state">
+                    <p>Belum ada riwayat penambahan barang</p>
+                </div>
+            <?php else: ?>
+                <div style="max-height: 500px; overflow-y: auto;">
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <?php foreach ($barang_history as $history): ?>
+                            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-left: 3px solid #10b981; border-radius: 8px; padding: 12px;">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                                    <div style="flex: 1;">
+                                        <div style="font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">
+                                            <?= htmlspecialchars($history['nama_barang']) ?>
+                                        </div>
+                                        <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">
+                                            Harga: Rp <?= number_format($history['harga'], 0, ',', '.') ?> | 
+                                            Stok: <?= $history['stok'] ?>
+                                        </div>
+                                        <div style="font-size: 11px; color: #9ca3af;">
+                                            <?= date('d/m/Y H:i:s', strtotime($history['created_at'])) ?> | 
+                                            Oleh: <?= htmlspecialchars($history['created_by'] ?? 'dosen') ?>
+                                        </div>
+                                    </div>
+                                    <span style="display: inline-block; padding: 4px 10px; background: #d1fae5; color: #065f46; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                                        <?= ucfirst($history['action_type'] ?? 'added') ?>
+                                    </span>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 
