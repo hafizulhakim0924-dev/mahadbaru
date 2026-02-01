@@ -981,6 +981,51 @@ input, textarea, select {
         }
         .content { padding: 20px; }
         .content-with-bottom-nav { padding-bottom: 90px !important; }
+        .product-list-item {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .product-list-item:hover {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+        .product-list-item:active {
+            transform: scale(0.98);
+        }
+        .product-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+        .product-info {
+            font-size: 13px;
+            color: #6b7280;
+        }
+        .product-add-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background: #10b981;
+            color: white;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .product-list-item:hover .product-add-btn {
+            background: #059669;
+            transform: scale(1.1);
+        }
         .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .bill-item { border: 2px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s; }
         .bill-item:hover { border-color: #10b981; }
@@ -1657,22 +1702,24 @@ input, textarea, select {
                 
                 ?>
                 
-                <div class="card">
-                    <h2 style="margin-bottom: 20px;">Daftar Barang Tersedia</h2>
+                <div class="card" style="padding: 16px;">
+                    <h2 style="margin-bottom: 12px; font-size: 16px; font-weight: 600; color: #1a1a1a;">Daftar Barang</h2>
                     <?php if (empty($barang_list)): ?>
                         <div class="empty-state">
                             <h3>Tidak Ada Barang Tersedia</h3>
                             <p>Barang akan muncul setelah admin menambahkan produk.</p>
                         </div>
                     <?php else: ?>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px;">
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
                             <?php foreach ($barang_list as $barang): ?>
-                                <div style="background: #f7fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981; cursor: pointer;" onclick="addToCart(<?= $barang['id'] ?>, '<?= htmlspecialchars($barang['nama_barang'], ENT_QUOTES) ?>', <?= $barang['harga'] ?>, <?= $barang['stok'] ?>)">
-                                    <h4 style="color: #2d3748; margin-bottom: 10px;"><?= htmlspecialchars($barang['nama_barang']) ?></h4>
-                                    <p style="color: #4a5568; font-size: 14px; margin: 5px 0;"><?= htmlspecialchars($barang['deskripsi'] ?? '') ?></p>
-                                    <p style="margin: 10px 0;"><strong>Harga: Rp <?= number_format($barang['harga'], 0, ',', '.') ?></strong></p>
-                                    <p style="font-size: 12px; color: #666;">Stok: <?= $barang['stok'] ?> unit</p>
-                                    <button class="btn btn-primary btn-small btn-full" style="margin-top: 10px;">Tambah ke Keranjang</button>
+                                <div class="product-list-item" onclick="addToCart(<?= $barang['id'] ?>, '<?= htmlspecialchars($barang['nama_barang'], ENT_QUOTES) ?>', <?= $barang['harga'] ?>, <?= $barang['stok'] ?>)">
+                                    <div style="flex: 1;">
+                                        <div class="product-name"><?= htmlspecialchars($barang['nama_barang']) ?></div>
+                                        <div class="product-info">Rp <?= number_format($barang['harga'], 0, ',', '.') ?> • Stok: <?= $barang['stok'] ?></div>
+                                    </div>
+                                    <div style="margin-left: 12px;">
+                                        <span class="product-add-btn">+</span>
+                                    </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
