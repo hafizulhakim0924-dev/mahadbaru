@@ -1,0 +1,15 @@
+---PANDUAN SINGKAT APLIKASI---
+
+1. Copy folder "ci" ke folder "xampp/htdocs"
+2. Buka file "ci/application/config" lalu sesuaikan base url "http://localhost/ci/"
+3. Buka phpmyadmin dan buat database baru bernama "ci"
+4. Restore dan impor database "ci.sql"
+5. Buka "http://localhost/ci/"
+
+-- User Keuangan --
+username	:user@gmail.com
+password	:1234
+
+-- User Admin --
+username	:admin@gmail.com
+password	:1234
