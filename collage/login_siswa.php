@@ -6,7 +6,7 @@ $username = "ypikhair_admin";
 $password = "hakim123123123";
 $dbname = "ypikhair_datautama";
 
-// Redirect jika sudah login
+// Redirect jika sudah login (check semua role)
 if (isset($_SESSION['student'])) {
     $action = $_GET['action'] ?? null;
     $tab_map = [
@@ -17,6 +17,21 @@ if (isset($_SESSION['student'])) {
     ];
     $redirect_tab = isset($tab_map[$action]) ? '?tab=' . $tab_map[$action] : '';
     header('Location: profile.php' . $redirect_tab);
+    exit;
+}
+
+if (isset($_SESSION['dosen_id'])) {
+    header('Location: dosen_absensi.php');
+    exit;
+}
+
+if (isset($_SESSION['admin_id'])) {
+    header('Location: adminbelanja.php');
+    exit;
+}
+
+if (isset($_SESSION['keuangan_id'])) {
+    header('Location: keuangan_dashboard.php');
     exit;
 }
 
@@ -88,11 +103,11 @@ $device_id = $_GET['device_id'] ?? $_POST['device_id'] ?? null;
 $fcm_token = $_GET['token'] ?? $_POST['token'] ?? null;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $student_id = trim($_POST['student_id']);
+    $username_input = trim($_POST['username']);
     $password_input = trim($_POST['password']);
 
     // Admin khusus
-    if ($student_id === 'khalid' && $password_input === 'syakila') {
+    if ($username_input === 'khalid' && $password_input === 'syakila') {
         $_SESSION['admin_khusus'] = true;
         header('Location: penarikan.php');
         exit;
@@ -103,73 +118,141 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if ($conn->connect_error) {
         $error = "Koneksi database gagal!";
     } else {
-        $student_id_int = intval($student_id);
+        $logged_in = false;
+        $user_type = null;
 
-        $stmt = $conn->prepare("
-            SELECT * FROM students WHERE id = ? AND password = ?
-        ");
-        $stmt->bind_param("is", $student_id_int, $password_input);
-        $stmt->execute();
-        $result = $stmt->get_result();
+        // 1. Cek sebagai Student (menggunakan ID numerik)
+        if (is_numeric($username_input)) {
+            $student_id_int = intval($username_input);
+            $stmt = $conn->prepare("SELECT * FROM students WHERE id = ? AND password = ?");
+            $stmt->bind_param("is", $student_id_int, $password_input);
+            $stmt->execute();
+            $result = $stmt->get_result();
 
-        if ($result->num_rows > 0) {
-            $student = $result->fetch_assoc();
-            $_SESSION['student'] = $student;
+            if ($result->num_rows > 0) {
+                $student = $result->fetch_assoc();
+                $_SESSION['student'] = $student;
+                $logged_in = true;
+                $user_type = 'student';
 
-            // ================================
-            // DAFTAR DEVICE UNTUK AUTO-LOGIN NEXT TIME
-            // ================================
-            if (!empty($device_id) && !empty($fcm_token)) {
-                
-                // Cek apakah device_id sudah terdaftar
-                $stmt_check = $conn->prepare("
-                    SELECT id FROM tokens WHERE device_id = ? AND user_id = ?
-                ");
-                $stmt_check->bind_param("si", $device_id, $student['id']);
-                $stmt_check->execute();
-                $check_result = $stmt_check->get_result();
+                // DAFTAR DEVICE UNTUK AUTO-LOGIN NEXT TIME (hanya untuk student)
+                if (!empty($device_id) && !empty($fcm_token)) {
+                    // Cek apakah device_id sudah terdaftar
+                    $stmt_check = $conn->prepare("SELECT id FROM tokens WHERE device_id = ? AND user_id = ?");
+                    $stmt_check->bind_param("si", $device_id, $student['id']);
+                    $stmt_check->execute();
+                    $check_result = $stmt_check->get_result();
 
-                if ($check_result->num_rows > 0) {
-                    // Update token jika device sudah terdaftar
-                    $stmt_update = $conn->prepare("
-                        UPDATE tokens 
-                        SET token = ?, expired_at = DATE_ADD(NOW(), INTERVAL 7 DAY)
-                        WHERE device_id = ? AND user_id = ?
-                    ");
-                    $stmt_update->bind_param("ssi", $fcm_token, $device_id, $student['id']);
-                    $stmt_update->execute();
-                    $stmt_update->close();
-                } else {
-                    // Insert token baru untuk device ini
-                    $token = bin2hex(random_bytes(20));
-                    
-                    $stmt_insert = $conn->prepare("
-                        INSERT INTO tokens (user_id, token, device_id, expired_at)
-                        VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))
-                    ");
-                    $stmt_insert->bind_param("iss", $student['id'], $token, $device_id);
-                    $stmt_insert->execute();
-                    $stmt_insert->close();
+                    if ($check_result->num_rows > 0) {
+                        // Update token jika device sudah terdaftar
+                        $stmt_update = $conn->prepare("
+                            UPDATE tokens 
+                            SET token = ?, expired_at = DATE_ADD(NOW(), INTERVAL 7 DAY)
+                            WHERE device_id = ? AND user_id = ?
+                        ");
+                        $stmt_update->bind_param("ssi", $fcm_token, $device_id, $student['id']);
+                        $stmt_update->execute();
+                        $stmt_update->close();
+                    } else {
+                        // Insert token baru untuk device ini
+                        $token = bin2hex(random_bytes(20));
+                        $stmt_insert = $conn->prepare("
+                            INSERT INTO tokens (user_id, token, device_id, expired_at)
+                            VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))
+                        ");
+                        $stmt_insert->bind_param("iss", $student['id'], $token, $device_id);
+                        $stmt_insert->execute();
+                        $stmt_insert->close();
+                    }
+                    $stmt_check->close();
                 }
-                $stmt_check->close();
             }
-
-            $conn->close();
-            $tab_map = [
-                'bayar' => 'bayar',
-                'belanja' => 'belanja',
-                'voucher' => 'voucher',
-                'absensi' => 'absensi'
-            ];
-            $redirect_tab = isset($tab_map[$action]) ? '?tab=' . $tab_map[$action] : '';
-            header("Location: profile.php" . $redirect_tab);
-            exit;
-
-        } else {
-            $error = "ID atau Password salah!";
+            $stmt->close();
         }
-        
+
+        // 2. Cek sebagai Dosen (jika belum login)
+        if (!$logged_in) {
+            $stmt = $conn->prepare("SELECT * FROM dosen WHERE username = ? AND password = ?");
+            $stmt->bind_param("ss", $username_input, $password_input);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result->num_rows > 0) {
+                $dosen = $result->fetch_assoc();
+                $_SESSION['dosen_id'] = $dosen['id'];
+                $_SESSION['dosen_nama'] = $dosen['nama'];
+                $logged_in = true;
+                $user_type = 'dosen';
+            }
+            $stmt->close();
+        }
+
+        // 3. Cek sebagai Admin (jika belum login)
+        if (!$logged_in) {
+            $stmt = $conn->prepare("SELECT * FROM admin WHERE username = ? AND password = ?");
+            $stmt->bind_param("ss", $username_input, $password_input);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result->num_rows > 0) {
+                $admin = $result->fetch_assoc();
+                $_SESSION['admin_id'] = $admin['id'];
+                $_SESSION['admin_nama'] = $admin['nama'];
+                $logged_in = true;
+                $user_type = 'admin';
+            }
+            $stmt->close();
+        }
+
+        // 4. Cek sebagai Keuangan (jika belum login)
+        if (!$logged_in) {
+            // Cek apakah tabel keuangan ada
+            $table_check = $conn->query("SHOW TABLES LIKE 'keuangan'");
+            if ($table_check && $table_check->num_rows > 0) {
+                $stmt = $conn->prepare("SELECT * FROM keuangan WHERE username = ? AND password = ?");
+                $stmt->bind_param("ss", $username_input, $password_input);
+                $stmt->execute();
+                $result = $stmt->get_result();
+
+                if ($result->num_rows > 0) {
+                    $keuangan = $result->fetch_assoc();
+                    $_SESSION['keuangan_id'] = $keuangan['id'];
+                    $_SESSION['keuangan_nama'] = $keuangan['nama'];
+                    $logged_in = true;
+                    $user_type = 'keuangan';
+                }
+                $stmt->close();
+            }
+        }
+
         $conn->close();
+
+        // Redirect berdasarkan user type
+        if ($logged_in) {
+            switch ($user_type) {
+                case 'student':
+                    $tab_map = [
+                        'bayar' => 'bayar',
+                        'belanja' => 'belanja',
+                        'voucher' => 'voucher',
+                        'absensi' => 'absensi'
+                    ];
+                    $redirect_tab = isset($tab_map[$action]) ? '?tab=' . $tab_map[$action] : '';
+                    header("Location: profile.php" . $redirect_tab);
+                    exit;
+                case 'dosen':
+                    header('Location: dosen_absensi.php');
+                    exit;
+                case 'admin':
+                    header('Location: adminbelanja.php');
+                    exit;
+                case 'keuangan':
+                    header('Location: keuangan_dashboard.php');
+                    exit;
+            }
+        } else {
+            $error = "Username/ID atau Password salah!";
+        }
     }
 }
 ?>
@@ -397,7 +480,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <img src="https://ibnuzubair.ypi-khairaummah.sch.id/logo.jpeg" class="logo" alt="Logo">
 
         <h1 class="title">Mahad Ibnu Zubair</h1>
-        <p class="subtitle">Portal Siswa</p>
+        <p class="subtitle">Portal Login Terpadu</p>
 
         <!-- Halaman Login -->
         <?php if(!empty($device_id)): ?>
@@ -409,9 +492,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <form method="POST" id="loginForm">
             <input 
                 type="text" 
-                name="student_id" 
+                name="username" 
                 class="input" 
-                placeholder="ID Siswa" 
+                placeholder="ID Siswa / Username" 
                 required 
                 autofocus
                 autocomplete="username"
@@ -439,8 +522,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <?php endif; ?>
 
         <div class="divider"><span>atau</span></div>
-        <a href="register_siswa.php" class="btn2 primary">Daftar Akun Baru</a>
+        <a href="register_siswa.php" class="btn2 primary">Daftar Akun Siswa</a>
         <a href="change_password.php" class="btn2">Ubah Password</a>
+        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+            <p style="text-align: center; color: #6b7280; font-size: 12px; margin-bottom: 8px;">
+                Login sebagai:
+            </p>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+                <span style="background: #eff6ff; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Siswa (ID)</span>
+                <span style="background: #f0fdf4; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Dosen</span>
+                <span style="background: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Admin</span>
+                <span style="background: #fce7f3; color: #9f1239; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Keuangan</span>
+            </div>
+        </div>
     </div>
 
     <script>

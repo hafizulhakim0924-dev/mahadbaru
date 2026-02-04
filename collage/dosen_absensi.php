@@ -7,80 +7,9 @@ $username = "ypikhair_admin";
 $password = "hakim123123123";
 $dbname = "ypikhair_datautama";
 
-// Check if dosen is logged in
+// Check if dosen is logged in - redirect to unified login if not
 if (!isset($_SESSION['dosen_id'])) {
-    // Handle login
-    if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-        $username = trim($_POST['username'] ?? '');
-        $password_input = trim($_POST['password'] ?? '');
-        
-        $conn = new mysqli($servername, $username, $password, $dbname);
-        
-        if (!$conn->connect_error) {
-            $stmt = $conn->prepare("SELECT * FROM dosen WHERE username = ? AND password = ?");
-            $stmt->bind_param("ss", $username, $password_input);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            
-            if ($result->num_rows > 0) {
-                $dosen = $result->fetch_assoc();
-                $_SESSION['dosen_id'] = $dosen['id'];
-                $_SESSION['dosen_nama'] = $dosen['nama'];
-                header('Location: dosen_absensi.php');
-                exit;
-            } else {
-                $error = "Username atau password salah!";
-            }
-            $stmt->close();
-            $conn->close();
-        }
-    }
-    
-    // Show login form
-    ?>
-    <!DOCTYPE html>
-    <html lang="id">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Login Dosen - Input Absensi</title>
-        <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-            .container { background: white; padding: 40px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
-            h1 { color: #667eea; margin-bottom: 10px; text-align: center; }
-            .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
-            .form-group { margin-bottom: 20px; }
-            label { display: block; margin-bottom: 8px; color: #333; font-weight: 600; }
-            input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px; }
-            input:focus { outline: none; border-color: #667eea; }
-            .btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
-            .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); }
-            .error { background: #fee; color: #c33; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>Login Dosen</h1>
-            <p class="subtitle">Sistem Input Absensi</p>
-            <?php if (isset($error)): ?>
-                <div class="error"><?= htmlspecialchars($error) ?></div>
-            <?php endif; ?>
-            <form method="POST">
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" name="username" required autofocus>
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" name="password" required>
-                </div>
-                <button type="submit" class="btn">Masuk</button>
-            </form>
-        </div>
-    </body>
-    </html>
-    <?php
+    header('Location: login_siswa.php');
     exit;
 }
 
