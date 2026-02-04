@@ -48,7 +48,6 @@ if (isset($_GET['device_id']) && isset($_GET['token'])) {
     $conn = new mysqli($servername, $username, $password, $dbname);
 
     if (!$conn->connect_error) {
-        // Cari siswa berdasarkan device_id yang terdaftar
         $stmt = $conn->prepare("
             SELECT students.* 
             FROM students
@@ -63,27 +62,16 @@ if (isset($_GET['device_id']) && isset($_GET['token'])) {
             $result = $stmt->get_result();
 
             if ($result->num_rows > 0) {
-                // Auto-login berhasil (user pernah login sebelumnya)
                 $student = $result->fetch_assoc();
                 $_SESSION['student'] = $student;
                 
-                // Update FCM token
-                $stmt2 = $conn->prepare("
-                    UPDATE tokens 
-                    SET token = ? 
-                    WHERE device_id = ? AND user_id = ?
-                ");
+                $stmt2 = $conn->prepare("UPDATE tokens SET token = ? WHERE device_id = ? AND user_id = ?");
                 $stmt2->bind_param("ssi", $fcm_token, $device_id, $student['id']);
                 $stmt2->execute();
                 $stmt2->close();
                 
                 $conn->close();
-                $tab_map = [
-                    'bayar' => 'bayar',
-                    'belanja' => 'belanja',
-                    'voucher' => 'voucher',
-                    'absensi' => 'absensi'
-                ];
+                $tab_map = ['bayar' => 'bayar', 'belanja' => 'belanja', 'voucher' => 'voucher', 'absensi' => 'absensi'];
                 $redirect_tab = isset($tab_map[$action]) ? '?tab=' . $tab_map[$action] : '';
                 header("Location: profile.php" . $redirect_tab);
                 exit;
@@ -92,11 +80,10 @@ if (isset($_GET['device_id']) && isset($_GET['token'])) {
         }
     }
     $conn->close();
-    // Jika auto-login gagal, lanjut ke form login (user baru)
 }
 
 // ======================================================
-// MANUAL LOGIN (USER BARU ATAU AUTO-LOGIN GAGAL)
+// MANUAL LOGIN
 // ======================================================
 $error = '';
 $device_id = $_GET['device_id'] ?? $_POST['device_id'] ?? null;
@@ -105,10 +92,7 @@ $fcm_token = $_GET['token'] ?? $_POST['token'] ?? null;
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username_input = trim($_POST['username'] ?? '');
     $password_input = trim($_POST['password'] ?? '');
-    $user_type_selected = trim($_POST['user_type'] ?? 'student'); // Default to student if not set
-    
-    // Debug: Log received data
-    error_log("Login attempt - Username: $username_input, Type: $user_type_selected");
+    $user_type_selected = trim($_POST['user_type'] ?? 'student');
 
     // Admin khusus
     if ($username_input === 'khalid' && $password_input === 'syakila') {
@@ -125,13 +109,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $logged_in = false;
         $user_type = null;
 
-        // Debug log
-        error_log("Processing login - user_type_selected: $user_type_selected, username: $username_input");
-
         // Login berdasarkan tab yang dipilih
         switch ($user_type_selected) {
             case 'student':
-                // Login sebagai Student
                 $student_id_int = is_numeric($username_input) ? intval($username_input) : 0;
                 if ($student_id_int > 0) {
                     $stmt = $conn->prepare("SELECT * FROM students WHERE id = ? AND password = ?");
@@ -145,31 +125,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $logged_in = true;
                         $user_type = 'student';
 
-                        // DAFTAR DEVICE UNTUK AUTO-LOGIN NEXT TIME (hanya untuk student)
                         if (!empty($device_id) && !empty($fcm_token)) {
-                            // Cek apakah device_id sudah terdaftar
                             $stmt_check = $conn->prepare("SELECT id FROM tokens WHERE device_id = ? AND user_id = ?");
                             $stmt_check->bind_param("si", $device_id, $student['id']);
                             $stmt_check->execute();
                             $check_result = $stmt_check->get_result();
 
                             if ($check_result->num_rows > 0) {
-                                // Update token jika device sudah terdaftar
-                                $stmt_update = $conn->prepare("
-                                    UPDATE tokens 
-                                    SET token = ?, expired_at = DATE_ADD(NOW(), INTERVAL 7 DAY)
-                                    WHERE device_id = ? AND user_id = ?
-                                ");
+                                $stmt_update = $conn->prepare("UPDATE tokens SET token = ?, expired_at = DATE_ADD(NOW(), INTERVAL 7 DAY) WHERE device_id = ? AND user_id = ?");
                                 $stmt_update->bind_param("ssi", $fcm_token, $device_id, $student['id']);
                                 $stmt_update->execute();
                                 $stmt_update->close();
                             } else {
-                                // Insert token baru untuk device ini
                                 $token = bin2hex(random_bytes(20));
-                                $stmt_insert = $conn->prepare("
-                                    INSERT INTO tokens (user_id, token, device_id, expired_at)
-                                    VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))
-                                ");
+                                $stmt_insert = $conn->prepare("INSERT INTO tokens (user_id, token, device_id, expired_at) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))");
                                 $stmt_insert->bind_param("iss", $student['id'], $token, $device_id);
                                 $stmt_insert->execute();
                                 $stmt_insert->close();
@@ -182,15 +151,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'dosen':
-                // Hardcode login untuk tester
                 if ($username_input === 'super123' && $password_input === 'super123') {
                     $_SESSION['dosen_id'] = 999;
                     $_SESSION['dosen_nama'] = 'Dosen Tester';
                     $logged_in = true;
                     $user_type = 'dosen';
-                    error_log("Hardcode login successful for dosen");
                 } else {
-                    // Login sebagai Dosen dari database
                     $stmt = $conn->prepare("SELECT * FROM dosen WHERE username = ? AND password = ?");
                     $stmt->bind_param("ss", $username_input, $password_input);
                     $stmt->execute();
@@ -208,14 +174,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'admin':
-                // Hardcode login untuk tester
                 if ($username_input === 'super123' && $password_input === 'super123') {
                     $_SESSION['admin_id'] = 999;
                     $_SESSION['admin_nama'] = 'Admin Tester';
                     $logged_in = true;
                     $user_type = 'admin';
                 } else {
-                    // Login sebagai Admin dari database
                     $stmt = $conn->prepare("SELECT * FROM admin WHERE username = ? AND password = ?");
                     $stmt->bind_param("ss", $username_input, $password_input);
                     $stmt->execute();
@@ -233,15 +197,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'keuangan':
-                // Hardcode login untuk tester
                 if ($username_input === 'super123' && $password_input === 'super123') {
                     $_SESSION['keuangan_id'] = 999;
                     $_SESSION['keuangan_nama'] = 'Keuangan Tester';
                     $logged_in = true;
                     $user_type = 'keuangan';
-                    error_log("Hardcode login successful for keuangan");
                 } else {
-                    // Login sebagai Keuangan dari database
                     $table_check = $conn->query("SHOW TABLES LIKE 'keuangan'");
                     if ($table_check && $table_check->num_rows > 0) {
                         $stmt = $conn->prepare("SELECT * FROM keuangan WHERE username = ? AND password = ?");
@@ -264,54 +225,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         $conn->close();
 
-        // Redirect berdasarkan user type
-        if ($logged_in && !empty($user_type)) {
-            // Redirect based on user type
+        // Redirect setelah login berhasil
+        if ($logged_in && $user_type) {
             $redirect_url = '';
             switch ($user_type) {
                 case 'student':
-                    $tab_map = [
-                        'bayar' => 'bayar',
-                        'belanja' => 'belanja',
-                        'voucher' => 'voucher',
-                        'absensi' => 'absensi'
-                    ];
+                    $tab_map = ['bayar' => 'bayar', 'belanja' => 'belanja', 'voucher' => 'voucher', 'absensi' => 'absensi'];
                     $redirect_tab = isset($tab_map[$action]) ? '?tab=' . $tab_map[$action] : '';
                     $redirect_url = 'profile.php' . $redirect_tab;
                     break;
-                    
                 case 'dosen':
                     $redirect_url = 'dosen_absensi.php';
                     break;
-                    
                 case 'admin':
                     $redirect_url = 'adminbelanja.php';
                     break;
-                    
                 case 'keuangan':
                     $redirect_url = 'keuangan_dashboard.php';
                     break;
-                    
-                default:
-                    $error = "Tipe user tidak valid!";
-                    break;
             }
             
-            if (!empty($redirect_url) && empty($error)) {
-                // Ensure no output before redirect
-                if (ob_get_length()) {
-                    ob_clean();
-                }
-                error_log("Redirecting to: " . $redirect_url . " for user_type: " . $user_type);
+            if ($redirect_url) {
                 header("Location: " . $redirect_url);
                 exit();
-            } else {
-                error_log("Redirect failed - redirect_url: " . ($redirect_url ?? 'empty') . ", error: " . ($error ?? 'none') . ", logged_in: " . ($logged_in ? 'true' : 'false') . ", user_type: " . ($user_type ?? 'empty'));
             }
         } else {
-            if (empty($error)) {
-                $error = "Username/ID atau Password salah!";
-            }
+            $error = "Username/ID atau Password salah!";
         }
     }
 }
@@ -322,7 +261,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Mahad Ibnu Zubair</title>
-
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         input, textarea, select { -webkit-user-select: text; }
@@ -477,62 +415,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             border: 1.5px solid #fde68a; 
             color: #92400e; 
         }
-        .hidden { display: none; }
-        .menu-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 24px;
-        }
-        @media (max-width: 480px) {
-            .menu-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        .menu-card {
-            background: #f9fafb;
-            border: 2px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 24px 16px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
-            display: block;
-        }
-        .menu-card:hover {
-            border-color: #667eea;
-            background: #f0f4ff;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
-        }
-        .menu-card:active {
-            transform: translateY(0);
-        }
-        .menu-icon {
-            font-size: 36px;
-            margin-bottom: 10px;
-            line-height: 1;
-        }
-        .menu-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #1a1a1a;
-            margin: 0;
-        }
-        .back-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            color: #6b7280;
-            text-decoration: none;
-            font-size: 14px;
-            margin-bottom: 20px;
-            transition: color 0.2s;
-        }
-        .back-btn:hover {
-            color: #667eea;
-        }
         .tabs {
             display: flex;
             gap: 8px;
@@ -561,12 +443,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             border-bottom-color: #667eea;
             background: #f0f4ff;
         }
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
         @media (max-width: 480px) {
             .tabs {
                 flex-wrap: wrap;
@@ -585,7 +461,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <h1 class="title">Mahad Ibnu Zubair</h1>
         <p class="subtitle">Portal Login Terpadu</p>
 
-        <!-- Halaman Login -->
         <?php if(!empty($device_id)): ?>
         <div class="info new">
             Login dari aplikasi mobile
@@ -594,65 +469,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         <!-- Tab Selector -->
         <div class="tabs">
-            <button type="button" class="tab-btn active" onclick="switchTab('student', this)">Siswa</button>
-            <button type="button" class="tab-btn" onclick="switchTab('dosen', this)">Dosen</button>
-            <button type="button" class="tab-btn" onclick="switchTab('admin', this)">Admin</button>
-            <button type="button" class="tab-btn" onclick="switchTab('keuangan', this)">Keuangan</button>
+            <button type="button" class="tab-btn active" data-tab="student">Siswa</button>
+            <button type="button" class="tab-btn" data-tab="dosen">Dosen</button>
+            <button type="button" class="tab-btn" data-tab="admin">Admin</button>
+            <button type="button" class="tab-btn" data-tab="keuangan">Keuangan</button>
         </div>
 
         <form method="POST" id="loginForm">
             <input type="hidden" name="user_type" id="user_type" value="student">
             
-            <!-- Tab Siswa -->
-            <div id="tab-student" class="tab-content active">
-                <input 
-                    type="text" 
-                    name="username" 
-                    class="input" 
-                    placeholder="ID Siswa" 
-                    required 
-                    autofocus
-                    autocomplete="username"
-                    id="input-username"
-                >
-            </div>
-
-            <!-- Tab Dosen -->
-            <div id="tab-dosen" class="tab-content">
-                <input 
-                    type="text" 
-                    name="username" 
-                    class="input" 
-                    placeholder="Username Dosen" 
-                    required
-                    autocomplete="username"
-                >
-            </div>
-
-            <!-- Tab Admin -->
-            <div id="tab-admin" class="tab-content">
-                <input 
-                    type="text" 
-                    name="username" 
-                    class="input" 
-                    placeholder="Username Admin" 
-                    required
-                    autocomplete="username"
-                >
-            </div>
-
-            <!-- Tab Keuangan -->
-            <div id="tab-keuangan" class="tab-content">
-                <input 
-                    type="text" 
-                    name="username" 
-                    class="input" 
-                    placeholder="Username Keuangan" 
-                    required
-                    autocomplete="username"
-                >
-            </div>
-
+            <input 
+                type="text" 
+                name="username" 
+                id="username_input"
+                class="input" 
+                placeholder="ID Siswa" 
+                required
+                autofocus
+                autocomplete="username"
+            >
+            
             <input 
                 type="password" 
                 name="password" 
@@ -662,7 +498,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 autocomplete="current-password"
             >
             
-            <!-- HIDDEN FIELDS untuk device_id dan token dari app -->
             <?php if(!empty($device_id)): ?>
             <input type="hidden" name="device_id" value="<?= htmlspecialchars($device_id) ?>">
             <input type="hidden" name="token" value="<?= htmlspecialchars($fcm_token) ?>">
@@ -681,86 +516,40 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
 
     <script>
-        // Debug logging (hanya di console)
-        const deviceId = '<?= htmlspecialchars($device_id ?? "") ?>';
-        const fcmToken = '<?= htmlspecialchars($fcm_token ?? "") ?>';
-        
-        if (deviceId && fcmToken) {
-            console.log('🔐 App Login Info:');
-            console.log('Device ID:', deviceId);
-            console.log('FCM Token:', fcmToken.substring(0, 10) + '...');
-        }
-
-        // Tab switching function
-        function switchTab(tabName, buttonElement) {
-            // Hide all tabs
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-
-            // Show selected tab
-            const selectedTab = document.getElementById('tab-' + tabName);
-            if (selectedTab) {
-                selectedTab.classList.add('active');
-            }
-            
-            if (buttonElement) {
-                buttonElement.classList.add('active');
-            }
-
-            // Update hidden input
-            const userTypeInput = document.getElementById('user_type');
-            if (userTypeInput) {
-                userTypeInput.value = tabName;
-            }
-
-            // Focus on username input
-            const usernameInput = document.querySelector('#tab-' + tabName + ' input[name="username"]');
-            if (usernameInput) {
-                setTimeout(() => usernameInput.focus(), 100);
-            }
-        }
-        
-        // Ensure form submits with correct user_type
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.addEventListener('submit', function(e) {
-                // Get active tab
-                const activeTab = document.querySelector('.tab-content.active');
-                let tabId = 'student'; // default
+        // Tab switching - Sederhana dan langsung
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Update active tab button
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
                 
-                if (activeTab) {
-                    tabId = activeTab.id.replace('tab-', '');
-                } else {
-                    // Fallback: get from active tab button
-                    const activeBtn = document.querySelector('.tab-btn.active');
-                    if (activeBtn) {
-                        const tabText = activeBtn.textContent.trim().toLowerCase();
-                        const tabMap = {
-                            'siswa': 'student',
-                            'dosen': 'dosen',
-                            'admin': 'admin',
-                            'keuangan': 'keuangan'
-                        };
-                        if (tabMap[tabText]) {
-                            tabId = tabMap[tabText];
-                        }
-                    }
+                // Update user_type
+                const tabType = this.getAttribute('data-tab');
+                document.getElementById('user_type').value = tabType;
+                
+                // Update placeholder
+                const usernameInput = document.getElementById('username_input');
+                const placeholders = {
+                    'student': 'ID Siswa',
+                    'dosen': 'Username Dosen',
+                    'admin': 'Username Admin',
+                    'keuangan': 'Username Keuangan'
+                };
+                if (usernameInput && placeholders[tabType]) {
+                    usernameInput.placeholder = placeholders[tabType];
+                    usernameInput.focus();
                 }
-                
-                // Update user_type input BEFORE form submits
-                const userTypeInput = document.getElementById('user_type');
-                if (userTypeInput) {
-                    userTypeInput.value = tabId;
-                    console.log('Setting user_type to:', tabId);
-                }
-                
-                // Form will submit normally
             });
-        }
+        });
+        
+        // Pastikan user_type terupdate saat submit
+        document.getElementById('loginForm').addEventListener('submit', function() {
+            const activeTab = document.querySelector('.tab-btn.active');
+            if (activeTab) {
+                const tabType = activeTab.getAttribute('data-tab');
+                document.getElementById('user_type').value = tabType;
+            }
+        });
     </script>
 </body>
 </html>
