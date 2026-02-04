@@ -984,47 +984,111 @@ input, textarea, select {
         .product-list-item {
             background: #ffffff;
             border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 12px 16px;
+            border-radius: 12px;
+            padding: 16px;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
+            gap: 12px;
             transition: all 0.2s;
             cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
         .product-list-item:hover {
             border-color: #10b981;
             background: #f0fdf4;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
         }
         .product-list-item:active {
             transform: scale(0.98);
         }
+        .product-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            width: 100%;
+        }
+        .product-content {
+            flex: 1;
+            min-width: 0;
+        }
         .product-name {
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 600;
             color: #1a1a1a;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
+            line-height: 1.4;
+            word-wrap: break-word;
         }
-        .product-info {
+        .product-description {
             font-size: 13px;
             color: #6b7280;
+            line-height: 1.5;
+            margin-bottom: 8px;
+            word-wrap: break-word;
+        }
+        .product-price {
+            font-size: 18px;
+            font-weight: 700;
+            color: #10b981;
+            white-space: nowrap;
+            text-align: right;
+        }
+        .product-stock {
+            font-size: 12px;
+            color: #6b7280;
+            background: #f3f4f6;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 4px;
         }
         .product-add-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 32px;
-            background: #10b981;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
-            border-radius: 6px;
-            font-size: 18px;
+            border-radius: 10px;
+            font-size: 20px;
             font-weight: 600;
             transition: all 0.2s;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
         }
         .product-list-item:hover .product-add-btn {
-            background: #059669;
-            transform: scale(1.1);
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+        @media (min-width: 640px) {
+            .product-list-item {
+                padding: 20px;
+            }
+            .product-name {
+                font-size: 17px;
+            }
+            .product-price {
+                font-size: 20px;
+            }
+        }
+        @media (max-width: 639px) {
+            .product-list-item {
+                padding: 14px;
+            }
+            .product-name {
+                font-size: 15px;
+            }
+            .product-price {
+                font-size: 16px;
+            }
+            .product-add-btn {
+                width: 36px;
+                height: 36px;
+                font-size: 18px;
+            }
         }
         .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .bill-item { border: 2px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s; }
@@ -1688,15 +1752,21 @@ input, textarea, select {
                             <p>Barang akan muncul setelah admin menambahkan produk.</p>
                         </div>
                     <?php else: ?>
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
                             <?php foreach ($barang_list as $barang): ?>
                                 <div class="product-list-item" onclick="addToCart(<?= $barang['id'] ?>, '<?= htmlspecialchars($barang['nama_barang'], ENT_QUOTES) ?>', <?= $barang['harga'] ?>, <?= $barang['stok'] ?>)">
-                                    <div style="flex: 1;">
-                                        <div class="product-name"><?= htmlspecialchars($barang['nama_barang']) ?></div>
-                                        <div class="product-info">Rp <?= number_format($barang['harga'], 0, ',', '.') ?> • Stok: <?= $barang['stok'] ?></div>
-                                    </div>
-                                    <div style="margin-left: 12px;">
-                                        <span class="product-add-btn">+</span>
+                                    <div class="product-header">
+                                        <div class="product-content">
+                                            <div class="product-name"><?= htmlspecialchars($barang['nama_barang']) ?></div>
+                                            <?php if (!empty($barang['deskripsi'])): ?>
+                                                <div class="product-description"><?= htmlspecialchars($barang['deskripsi']) ?></div>
+                                            <?php endif; ?>
+                                            <div class="product-stock">Stok: <?= $barang['stok'] ?></div>
+                                        </div>
+                                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0;">
+                                            <div class="product-price">Rp <?= number_format($barang['harga'], 0, ',', '.') ?></div>
+                                            <span class="product-add-btn">+</span>
+                                        </div>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
