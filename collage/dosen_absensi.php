@@ -23,6 +23,10 @@ $conn->set_charset("utf8mb4");
 $dosen_id = $_SESSION['dosen_id'];
 $dosen_nama = $_SESSION['dosen_nama'];
 
+// Initialize variables
+$success = '';
+$error = '';
+
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] == 'input_absensi') {
@@ -320,8 +324,7 @@ $recent_absensi = [];
 while ($row = $result->fetch_assoc()) {
     $recent_absensi[] = $row;
 }
-    $stmt->close();
-}
+$stmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="id">
