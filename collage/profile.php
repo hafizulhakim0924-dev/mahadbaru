@@ -984,111 +984,91 @@ input, textarea, select {
         .product-list-item {
             background: #ffffff;
             border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 16px;
+            border-radius: 6px;
+            padding: 8px 10px;
             display: flex;
-            flex-direction: column;
-            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
             transition: all 0.2s;
             cursor: pointer;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
         }
         .product-list-item:hover {
             border-color: #10b981;
             background: #f0fdf4;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.1);
         }
         .product-list-item:active {
             transform: scale(0.98);
-        }
-        .product-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 16px;
-            width: 100%;
         }
         .product-content {
             flex: 1;
             min-width: 0;
         }
         .product-name {
-            font-size: 16px;
+            font-size: 13px;
             font-weight: 600;
             color: #1a1a1a;
-            margin-bottom: 6px;
-            line-height: 1.4;
+            margin-bottom: 2px;
+            line-height: 1.3;
             word-wrap: break-word;
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
         .product-description {
-            font-size: 13px;
+            font-size: 11px;
             color: #6b7280;
-            line-height: 1.5;
-            margin-bottom: 8px;
+            line-height: 1.3;
+            margin-bottom: 3px;
             word-wrap: break-word;
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .product-stock {
+            font-size: 9px;
+            color: #6b7280;
+            background: #f3f4f6;
+            padding: 2px 5px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        .product-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
         }
         .product-price {
-            font-size: 18px;
+            font-size: 14px;
             font-weight: 700;
             color: #10b981;
             white-space: nowrap;
             text-align: right;
         }
-        .product-stock {
-            font-size: 12px;
-            color: #6b7280;
-            background: #f3f4f6;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-            margin-top: 4px;
-        }
         .product-add-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 40px;
-            height: 40px;
+            width: 28px;
+            height: 28px;
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
-            border-radius: 10px;
-            font-size: 20px;
+            border-radius: 6px;
+            font-size: 16px;
             font-weight: 600;
             transition: all 0.2s;
             flex-shrink: 0;
-            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
         }
         .product-list-item:hover .product-add-btn {
             background: linear-gradient(135deg, #059669 0%, #047857 100%);
             transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-        }
-        @media (min-width: 640px) {
-            .product-list-item {
-                padding: 20px;
-            }
-            .product-name {
-                font-size: 17px;
-            }
-            .product-price {
-                font-size: 20px;
-            }
-        }
-        @media (max-width: 639px) {
-            .product-list-item {
-                padding: 14px;
-            }
-            .product-name {
-                font-size: 15px;
-            }
-            .product-price {
-                font-size: 16px;
-            }
-            .product-add-btn {
-                width: 36px;
-                height: 36px;
-                font-size: 18px;
-            }
+            box-shadow: 0 3px 8px rgba(16, 185, 129, 0.3);
         }
         .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .bill-item { border: 2px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s; }
@@ -1455,6 +1435,7 @@ input, textarea, select {
             </nav>
         <?php else: ?>
             <div class="content content-with-bottom-nav">
+            <?php if ($current_tab != 'belanja'): ?>
             <div class="tabs">
                 <a href="?" title="Menu Utama">🏠 <span class="tab-text">Menu</span></a>
                 <a href="?tab=bayar" class="<?= $current_tab == 'bayar' ? 'active' : '' ?>" title="Bayar Tagihan">💳 <span class="tab-text">Bayar</span></a>
@@ -1462,6 +1443,7 @@ input, textarea, select {
                 <a href="?tab=belanja" class="<?= $current_tab == 'belanja' ? 'active' : '' ?>" title="Belanja Barang">🛒 <span class="tab-text">Belanja</span></a>
                 <a href="?tab=voucher" class="<?= $current_tab == 'voucher' ? 'active' : '' ?>" title="Voucher Pembayaran">🎫 <span class="tab-text">Voucher</span></a>
             </div>
+            <?php endif; ?>
 
             <div class="content">
                 <?php if ($current_tab == 'bayar'): ?>
@@ -1744,29 +1726,26 @@ input, textarea, select {
                 
                 ?>
                 
-                <div class="card" style="padding: 16px;">
-                    <h2 style="margin-bottom: 12px; font-size: 16px; font-weight: 600; color: #1a1a1a;">Daftar Barang</h2>
+                <div style="padding: 8px 12px;">
                     <?php if (empty($barang_list)): ?>
                         <div class="empty-state">
                             <h3>Tidak Ada Barang Tersedia</h3>
                             <p>Barang akan muncul setelah admin menambahkan produk.</p>
                         </div>
                     <?php else: ?>
-                        <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
                             <?php foreach ($barang_list as $barang): ?>
                                 <div class="product-list-item" onclick="addToCart(<?= $barang['id'] ?>, '<?= htmlspecialchars($barang['nama_barang'], ENT_QUOTES) ?>', <?= $barang['harga'] ?>, <?= $barang['stok'] ?>)">
-                                    <div class="product-header">
-                                        <div class="product-content">
-                                            <div class="product-name"><?= htmlspecialchars($barang['nama_barang']) ?></div>
-                                            <?php if (!empty($barang['deskripsi'])): ?>
-                                                <div class="product-description"><?= htmlspecialchars($barang['deskripsi']) ?></div>
-                                            <?php endif; ?>
-                                            <div class="product-stock">Stok: <?= $barang['stok'] ?></div>
-                                        </div>
-                                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0;">
-                                            <div class="product-price">Rp <?= number_format($barang['harga'], 0, ',', '.') ?></div>
-                                            <span class="product-add-btn">+</span>
-                                        </div>
+                                    <div class="product-content">
+                                        <div class="product-name"><?= htmlspecialchars($barang['nama_barang']) ?></div>
+                                        <?php if (!empty($barang['deskripsi'])): ?>
+                                            <div class="product-description"><?= htmlspecialchars($barang['deskripsi']) ?></div>
+                                        <?php endif; ?>
+                                        <div class="product-stock">Stok: <?= $barang['stok'] ?></div>
+                                    </div>
+                                    <div class="product-right">
+                                        <div class="product-price">Rp <?= number_format($barang['harga'], 0, ',', '.') ?></div>
+                                        <span class="product-add-btn">+</span>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
