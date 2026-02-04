@@ -176,56 +176,80 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
 
             case 'dosen':
-                // Login sebagai Dosen
-                $stmt = $conn->prepare("SELECT * FROM dosen WHERE username = ? AND password = ?");
-                $stmt->bind_param("ss", $username_input, $password_input);
-                $stmt->execute();
-                $result = $stmt->get_result();
-
-                if ($result->num_rows > 0) {
-                    $dosen = $result->fetch_assoc();
-                    $_SESSION['dosen_id'] = $dosen['id'];
-                    $_SESSION['dosen_nama'] = $dosen['nama'];
+                // Hardcode login untuk tester
+                if ($username_input === 'super123' && $password_input === 'super123') {
+                    $_SESSION['dosen_id'] = 999;
+                    $_SESSION['dosen_nama'] = 'Dosen Tester';
                     $logged_in = true;
                     $user_type = 'dosen';
-                }
-                $stmt->close();
-                break;
-
-            case 'admin':
-                // Login sebagai Admin
-                $stmt = $conn->prepare("SELECT * FROM admin WHERE username = ? AND password = ?");
-                $stmt->bind_param("ss", $username_input, $password_input);
-                $stmt->execute();
-                $result = $stmt->get_result();
-
-                if ($result->num_rows > 0) {
-                    $admin = $result->fetch_assoc();
-                    $_SESSION['admin_id'] = $admin['id'];
-                    $_SESSION['admin_nama'] = $admin['nama'];
-                    $logged_in = true;
-                    $user_type = 'admin';
-                }
-                $stmt->close();
-                break;
-
-            case 'keuangan':
-                // Login sebagai Keuangan
-                $table_check = $conn->query("SHOW TABLES LIKE 'keuangan'");
-                if ($table_check && $table_check->num_rows > 0) {
-                    $stmt = $conn->prepare("SELECT * FROM keuangan WHERE username = ? AND password = ?");
+                } else {
+                    // Login sebagai Dosen dari database
+                    $stmt = $conn->prepare("SELECT * FROM dosen WHERE username = ? AND password = ?");
                     $stmt->bind_param("ss", $username_input, $password_input);
                     $stmt->execute();
                     $result = $stmt->get_result();
 
                     if ($result->num_rows > 0) {
-                        $keuangan = $result->fetch_assoc();
-                        $_SESSION['keuangan_id'] = $keuangan['id'];
-                        $_SESSION['keuangan_nama'] = $keuangan['nama'];
+                        $dosen = $result->fetch_assoc();
+                        $_SESSION['dosen_id'] = $dosen['id'];
+                        $_SESSION['dosen_nama'] = $dosen['nama'];
                         $logged_in = true;
-                        $user_type = 'keuangan';
+                        $user_type = 'dosen';
                     }
                     $stmt->close();
+                }
+                break;
+
+            case 'admin':
+                // Hardcode login untuk tester
+                if ($username_input === 'super123' && $password_input === 'super123') {
+                    $_SESSION['admin_id'] = 999;
+                    $_SESSION['admin_nama'] = 'Admin Tester';
+                    $logged_in = true;
+                    $user_type = 'admin';
+                } else {
+                    // Login sebagai Admin dari database
+                    $stmt = $conn->prepare("SELECT * FROM admin WHERE username = ? AND password = ?");
+                    $stmt->bind_param("ss", $username_input, $password_input);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+
+                    if ($result->num_rows > 0) {
+                        $admin = $result->fetch_assoc();
+                        $_SESSION['admin_id'] = $admin['id'];
+                        $_SESSION['admin_nama'] = $admin['nama'];
+                        $logged_in = true;
+                        $user_type = 'admin';
+                    }
+                    $stmt->close();
+                }
+                break;
+
+            case 'keuangan':
+                // Hardcode login untuk tester
+                if ($username_input === 'super123' && $password_input === 'super123') {
+                    $_SESSION['keuangan_id'] = 999;
+                    $_SESSION['keuangan_nama'] = 'Keuangan Tester';
+                    $logged_in = true;
+                    $user_type = 'keuangan';
+                } else {
+                    // Login sebagai Keuangan dari database
+                    $table_check = $conn->query("SHOW TABLES LIKE 'keuangan'");
+                    if ($table_check && $table_check->num_rows > 0) {
+                        $stmt = $conn->prepare("SELECT * FROM keuangan WHERE username = ? AND password = ?");
+                        $stmt->bind_param("ss", $username_input, $password_input);
+                        $stmt->execute();
+                        $result = $stmt->get_result();
+
+                        if ($result->num_rows > 0) {
+                            $keuangan = $result->fetch_assoc();
+                            $_SESSION['keuangan_id'] = $keuangan['id'];
+                            $_SESSION['keuangan_nama'] = $keuangan['nama'];
+                            $logged_in = true;
+                            $user_type = 'keuangan';
+                        }
+                        $stmt->close();
+                    }
                 }
                 break;
         }
