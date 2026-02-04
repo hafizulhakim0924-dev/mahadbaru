@@ -112,14 +112,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Login berdasarkan tab yang dipilih
         switch ($user_type_selected) {
             case 'student':
+                // Login untuk Students menggunakan tabel students
+                // Struktur tabel: id (int, PK), name, class, tingkat, spp_bulanan, tambahan, biayatambahan, password (varchar 100), phone_no, balance
                 $student_id_int = is_numeric($username_input) ? intval($username_input) : 0;
                 if ($student_id_int > 0) {
+                    // Query login: cek id dan password dari tabel students
+                    // Menggunakan SELECT * untuk mengambil semua field sesuai struktur tabel
                     $stmt = $conn->prepare("SELECT * FROM students WHERE id = ? AND password = ?");
                     $stmt->bind_param("is", $student_id_int, $password_input);
                     $stmt->execute();
                     $result = $stmt->get_result();
 
                     if ($result->num_rows > 0) {
+                        // Login berhasil - simpan semua data student ke session
+                        // Data yang tersimpan: id, name, class, tingkat, spp_bulanan, tambahan, biayatambahan, password, phone_no, balance
                         $student = $result->fetch_assoc();
                         $_SESSION['student'] = $student;
                         $logged_in = true;
