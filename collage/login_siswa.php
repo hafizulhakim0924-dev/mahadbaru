@@ -105,6 +105,7 @@ $fcm_token = $_GET['token'] ?? $_POST['token'] ?? null;
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username_input = trim($_POST['username']);
     $password_input = trim($_POST['password']);
+    $user_type_selected = trim($_POST['user_type'] ?? '');
 
     // Admin khusus
     if ($username_input === 'khalid' && $password_input === 'syakila') {
@@ -121,108 +122,112 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $logged_in = false;
         $user_type = null;
 
-        // 1. Cek sebagai Student (menggunakan ID numerik)
-        if (is_numeric($username_input)) {
-            $student_id_int = intval($username_input);
-            $stmt = $conn->prepare("SELECT * FROM students WHERE id = ? AND password = ?");
-            $stmt->bind_param("is", $student_id_int, $password_input);
-            $stmt->execute();
-            $result = $stmt->get_result();
+        // Login berdasarkan tab yang dipilih
+        switch ($user_type_selected) {
+            case 'student':
+                // Login sebagai Student
+                $student_id_int = is_numeric($username_input) ? intval($username_input) : 0;
+                if ($student_id_int > 0) {
+                    $stmt = $conn->prepare("SELECT * FROM students WHERE id = ? AND password = ?");
+                    $stmt->bind_param("is", $student_id_int, $password_input);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
 
-            if ($result->num_rows > 0) {
-                $student = $result->fetch_assoc();
-                $_SESSION['student'] = $student;
-                $logged_in = true;
-                $user_type = 'student';
+                    if ($result->num_rows > 0) {
+                        $student = $result->fetch_assoc();
+                        $_SESSION['student'] = $student;
+                        $logged_in = true;
+                        $user_type = 'student';
 
-                // DAFTAR DEVICE UNTUK AUTO-LOGIN NEXT TIME (hanya untuk student)
-                if (!empty($device_id) && !empty($fcm_token)) {
-                    // Cek apakah device_id sudah terdaftar
-                    $stmt_check = $conn->prepare("SELECT id FROM tokens WHERE device_id = ? AND user_id = ?");
-                    $stmt_check->bind_param("si", $device_id, $student['id']);
-                    $stmt_check->execute();
-                    $check_result = $stmt_check->get_result();
+                        // DAFTAR DEVICE UNTUK AUTO-LOGIN NEXT TIME (hanya untuk student)
+                        if (!empty($device_id) && !empty($fcm_token)) {
+                            // Cek apakah device_id sudah terdaftar
+                            $stmt_check = $conn->prepare("SELECT id FROM tokens WHERE device_id = ? AND user_id = ?");
+                            $stmt_check->bind_param("si", $device_id, $student['id']);
+                            $stmt_check->execute();
+                            $check_result = $stmt_check->get_result();
 
-                    if ($check_result->num_rows > 0) {
-                        // Update token jika device sudah terdaftar
-                        $stmt_update = $conn->prepare("
-                            UPDATE tokens 
-                            SET token = ?, expired_at = DATE_ADD(NOW(), INTERVAL 7 DAY)
-                            WHERE device_id = ? AND user_id = ?
-                        ");
-                        $stmt_update->bind_param("ssi", $fcm_token, $device_id, $student['id']);
-                        $stmt_update->execute();
-                        $stmt_update->close();
-                    } else {
-                        // Insert token baru untuk device ini
-                        $token = bin2hex(random_bytes(20));
-                        $stmt_insert = $conn->prepare("
-                            INSERT INTO tokens (user_id, token, device_id, expired_at)
-                            VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))
-                        ");
-                        $stmt_insert->bind_param("iss", $student['id'], $token, $device_id);
-                        $stmt_insert->execute();
-                        $stmt_insert->close();
+                            if ($check_result->num_rows > 0) {
+                                // Update token jika device sudah terdaftar
+                                $stmt_update = $conn->prepare("
+                                    UPDATE tokens 
+                                    SET token = ?, expired_at = DATE_ADD(NOW(), INTERVAL 7 DAY)
+                                    WHERE device_id = ? AND user_id = ?
+                                ");
+                                $stmt_update->bind_param("ssi", $fcm_token, $device_id, $student['id']);
+                                $stmt_update->execute();
+                                $stmt_update->close();
+                            } else {
+                                // Insert token baru untuk device ini
+                                $token = bin2hex(random_bytes(20));
+                                $stmt_insert = $conn->prepare("
+                                    INSERT INTO tokens (user_id, token, device_id, expired_at)
+                                    VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))
+                                ");
+                                $stmt_insert->bind_param("iss", $student['id'], $token, $device_id);
+                                $stmt_insert->execute();
+                                $stmt_insert->close();
+                            }
+                            $stmt_check->close();
+                        }
                     }
-                    $stmt_check->close();
+                    $stmt->close();
                 }
-            }
-            $stmt->close();
-        }
+                break;
 
-        // 2. Cek sebagai Dosen (jika belum login)
-        if (!$logged_in) {
-            $stmt = $conn->prepare("SELECT * FROM dosen WHERE username = ? AND password = ?");
-            $stmt->bind_param("ss", $username_input, $password_input);
-            $stmt->execute();
-            $result = $stmt->get_result();
-
-            if ($result->num_rows > 0) {
-                $dosen = $result->fetch_assoc();
-                $_SESSION['dosen_id'] = $dosen['id'];
-                $_SESSION['dosen_nama'] = $dosen['nama'];
-                $logged_in = true;
-                $user_type = 'dosen';
-            }
-            $stmt->close();
-        }
-
-        // 3. Cek sebagai Admin (jika belum login)
-        if (!$logged_in) {
-            $stmt = $conn->prepare("SELECT * FROM admin WHERE username = ? AND password = ?");
-            $stmt->bind_param("ss", $username_input, $password_input);
-            $stmt->execute();
-            $result = $stmt->get_result();
-
-            if ($result->num_rows > 0) {
-                $admin = $result->fetch_assoc();
-                $_SESSION['admin_id'] = $admin['id'];
-                $_SESSION['admin_nama'] = $admin['nama'];
-                $logged_in = true;
-                $user_type = 'admin';
-            }
-            $stmt->close();
-        }
-
-        // 4. Cek sebagai Keuangan (jika belum login)
-        if (!$logged_in) {
-            // Cek apakah tabel keuangan ada
-            $table_check = $conn->query("SHOW TABLES LIKE 'keuangan'");
-            if ($table_check && $table_check->num_rows > 0) {
-                $stmt = $conn->prepare("SELECT * FROM keuangan WHERE username = ? AND password = ?");
+            case 'dosen':
+                // Login sebagai Dosen
+                $stmt = $conn->prepare("SELECT * FROM dosen WHERE username = ? AND password = ?");
                 $stmt->bind_param("ss", $username_input, $password_input);
                 $stmt->execute();
                 $result = $stmt->get_result();
 
                 if ($result->num_rows > 0) {
-                    $keuangan = $result->fetch_assoc();
-                    $_SESSION['keuangan_id'] = $keuangan['id'];
-                    $_SESSION['keuangan_nama'] = $keuangan['nama'];
+                    $dosen = $result->fetch_assoc();
+                    $_SESSION['dosen_id'] = $dosen['id'];
+                    $_SESSION['dosen_nama'] = $dosen['nama'];
                     $logged_in = true;
-                    $user_type = 'keuangan';
+                    $user_type = 'dosen';
                 }
                 $stmt->close();
-            }
+                break;
+
+            case 'admin':
+                // Login sebagai Admin
+                $stmt = $conn->prepare("SELECT * FROM admin WHERE username = ? AND password = ?");
+                $stmt->bind_param("ss", $username_input, $password_input);
+                $stmt->execute();
+                $result = $stmt->get_result();
+
+                if ($result->num_rows > 0) {
+                    $admin = $result->fetch_assoc();
+                    $_SESSION['admin_id'] = $admin['id'];
+                    $_SESSION['admin_nama'] = $admin['nama'];
+                    $logged_in = true;
+                    $user_type = 'admin';
+                }
+                $stmt->close();
+                break;
+
+            case 'keuangan':
+                // Login sebagai Keuangan
+                $table_check = $conn->query("SHOW TABLES LIKE 'keuangan'");
+                if ($table_check && $table_check->num_rows > 0) {
+                    $stmt = $conn->prepare("SELECT * FROM keuangan WHERE username = ? AND password = ?");
+                    $stmt->bind_param("ss", $username_input, $password_input);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+
+                    if ($result->num_rows > 0) {
+                        $keuangan = $result->fetch_assoc();
+                        $_SESSION['keuangan_id'] = $keuangan['id'];
+                        $_SESSION['keuangan_nama'] = $keuangan['nama'];
+                        $logged_in = true;
+                        $user_type = 'keuangan';
+                    }
+                    $stmt->close();
+                }
+                break;
         }
 
         $conn->close();
@@ -473,6 +478,49 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .back-btn:hover {
             color: #667eea;
         }
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 12px 8px;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .tab-btn:hover {
+            color: #667eea;
+            background: #f9fafb;
+        }
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            background: #f0f4ff;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @media (max-width: 480px) {
+            .tabs {
+                flex-wrap: wrap;
+            }
+            .tab-btn {
+                font-size: 12px;
+                padding: 10px 6px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -489,16 +537,67 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
         <?php endif; ?>
 
+        <!-- Tab Selector -->
+        <div class="tabs">
+            <button type="button" class="tab-btn active" onclick="switchTab('student', this)">Siswa</button>
+            <button type="button" class="tab-btn" onclick="switchTab('dosen', this)">Dosen</button>
+            <button type="button" class="tab-btn" onclick="switchTab('admin', this)">Admin</button>
+            <button type="button" class="tab-btn" onclick="switchTab('keuangan', this)">Keuangan</button>
+        </div>
+
         <form method="POST" id="loginForm">
-            <input 
-                type="text" 
-                name="username" 
-                class="input" 
-                placeholder="ID Siswa / Username" 
-                required 
-                autofocus
-                autocomplete="username"
-            >
+            <input type="hidden" name="user_type" id="user_type" value="student">
+            
+            <!-- Tab Siswa -->
+            <div id="tab-student" class="tab-content active">
+                <input 
+                    type="text" 
+                    name="username" 
+                    class="input" 
+                    placeholder="ID Siswa" 
+                    required 
+                    autofocus
+                    autocomplete="username"
+                    id="input-username"
+                >
+            </div>
+
+            <!-- Tab Dosen -->
+            <div id="tab-dosen" class="tab-content">
+                <input 
+                    type="text" 
+                    name="username" 
+                    class="input" 
+                    placeholder="Username Dosen" 
+                    required
+                    autocomplete="username"
+                >
+            </div>
+
+            <!-- Tab Admin -->
+            <div id="tab-admin" class="tab-content">
+                <input 
+                    type="text" 
+                    name="username" 
+                    class="input" 
+                    placeholder="Username Admin" 
+                    required
+                    autocomplete="username"
+                >
+            </div>
+
+            <!-- Tab Keuangan -->
+            <div id="tab-keuangan" class="tab-content">
+                <input 
+                    type="text" 
+                    name="username" 
+                    class="input" 
+                    placeholder="Username Keuangan" 
+                    required
+                    autocomplete="username"
+                >
+            </div>
+
             <input 
                 type="password" 
                 name="password" 
@@ -524,17 +623,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <div class="divider"><span>atau</span></div>
         <a href="register_siswa.php" class="btn2 primary">Daftar Akun Siswa</a>
         <a href="change_password.php" class="btn2">Ubah Password</a>
-        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
-            <p style="text-align: center; color: #6b7280; font-size: 12px; margin-bottom: 8px;">
-                Login sebagai:
-            </p>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
-                <span style="background: #eff6ff; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Siswa (ID)</span>
-                <span style="background: #f0fdf4; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Dosen</span>
-                <span style="background: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Admin</span>
-                <span style="background: #fce7f3; color: #9f1239; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Keuangan</span>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -546,6 +634,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             console.log('🔐 App Login Info:');
             console.log('Device ID:', deviceId);
             console.log('FCM Token:', fcmToken.substring(0, 10) + '...');
+        }
+
+        // Tab switching function
+        function switchTab(tabName, buttonElement) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById('tab-' + tabName).classList.add('active');
+            if (buttonElement) {
+                buttonElement.classList.add('active');
+            }
+
+            // Update hidden input
+            document.getElementById('user_type').value = tabName;
+
+            // Focus on username input
+            const usernameInput = document.querySelector('#tab-' + tabName + ' input[name="username"]');
+            if (usernameInput) {
+                setTimeout(() => usernameInput.focus(), 100);
+            }
         }
     </script>
 </body>
