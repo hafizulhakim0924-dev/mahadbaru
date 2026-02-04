@@ -94,6 +94,120 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         } else {
             $error = "Voucher tidak ditemukan atau sudah diredeem!";
         }
+    } elseif ($_POST['action'] == 'import_barang') {
+        // Import bulk dari spreadsheet
+        $data_paste = trim($_POST['data_paste'] ?? '');
+        
+        if (empty($data_paste)) {
+            $error = "Data tidak boleh kosong!";
+        } else {
+            // Parse data yang di-paste
+            $lines = explode("\n", $data_paste);
+            $barang_data = [];
+            $errors = [];
+            $success_count = 0;
+            
+            foreach ($lines as $line_num => $line) {
+                $line = trim($line);
+                if (empty($line)) continue; // Skip baris kosong
+                
+                // Deteksi separator: tab atau koma
+                if (strpos($line, "\t") !== false) {
+                    $cols = explode("\t", $line);
+                } else {
+                    $cols = explode(",", $line);
+                }
+                
+                // Bersihkan setiap kolom
+                $cols = array_map('trim', $cols);
+                
+                // Skip header jika ada
+                if ($line_num == 0 && (strtolower($cols[0]) == 'nama_barang' || strtolower($cols[0]) == 'nama' || strtolower($cols[0]) == 'barang')) {
+                    continue;
+                }
+                
+                // Validasi jumlah kolom (minimal 3: nama, harga, stok)
+                if (count($cols) < 3) {
+                    $errors[] = "Baris " . ($line_num + 1) . ": Data tidak lengkap (minimal: Nama, Harga, Stok)";
+                    continue;
+                }
+                
+                // Parse data
+                $nama_barang = $cols[0] ?? '';
+                $deskripsi = $cols[1] ?? '';
+                $harga = isset($cols[2]) ? floatval(str_replace(['Rp', 'rp', '.', ','], '', $cols[2])) : 0;
+                $stok = isset($cols[3]) ? intval($cols[3]) : 0;
+                $status = isset($cols[4]) ? (strtolower(trim($cols[4])) == 'nonaktif' ? 'nonaktif' : 'aktif') : 'aktif';
+                
+                // Validasi
+                if (empty($nama_barang)) {
+                    $errors[] = "Baris " . ($line_num + 1) . ": Nama barang tidak boleh kosong";
+                    continue;
+                }
+                
+                if ($harga <= 0) {
+                    $errors[] = "Baris " . ($line_num + 1) . ": Harga harus lebih dari 0";
+                    continue;
+                }
+                
+                if ($stok < 0) {
+                    $errors[] = "Baris " . ($line_num + 1) . ": Stok tidak boleh negatif";
+                    continue;
+                }
+                
+                // Simpan untuk insert
+                $barang_data[] = [
+                    'nama_barang' => $nama_barang,
+                    'deskripsi' => $deskripsi,
+                    'harga' => $harga,
+                    'stok' => $stok,
+                    'status' => $status
+                ];
+            }
+            
+            // Insert ke database
+            if (!empty($barang_data)) {
+                $conn->begin_transaction();
+                
+                try {
+                    $stmt = $conn->prepare("INSERT INTO barang (nama_barang, deskripsi, harga, stok, status) VALUES (?, ?, ?, ?, ?)");
+                    
+                    foreach ($barang_data as $data) {
+                        $stmt->bind_param("ssdis", 
+                            $data['nama_barang'],
+                            $data['deskripsi'],
+                            $data['harga'],
+                            $data['stok'],
+                            $data['status']
+                        );
+                        
+                        if ($stmt->execute()) {
+                            $success_count++;
+                        } else {
+                            $errors[] = "Gagal insert: " . $data['nama_barang'] . " - " . $stmt->error;
+                        }
+                    }
+                    
+                    $stmt->close();
+                    
+                    if ($success_count > 0) {
+                        $conn->commit();
+                        $success = "Berhasil mengimport $success_count barang!";
+                        if (!empty($errors)) {
+                            $error = "Beberapa data gagal diimport:<br>" . implode("<br>", array_map('htmlspecialchars', $errors));
+                        }
+                    } else {
+                        $conn->rollback();
+                        $error = "Tidak ada data yang berhasil diimport.<br>" . implode("<br>", array_map('htmlspecialchars', $errors));
+                    }
+                } catch (Exception $e) {
+                    $conn->rollback();
+                    $error = "Error: " . $e->getMessage();
+                }
+            } else {
+                $error = "Tidak ada data valid untuk diimport.<br>" . implode("<br>", array_map('htmlspecialchars', $errors));
+            }
+        }
     }
 }
 
@@ -178,11 +292,12 @@ $conn->close();
             <div class="success"><?= htmlspecialchars($success) ?></div>
         <?php endif; ?>
         <?php if (isset($error)): ?>
-            <div class="error"><?= htmlspecialchars($error) ?></div>
+            <div class="error"><?= $error ?></div>
         <?php endif; ?>
 
         <div class="tabs">
             <button class="tab-btn active" onclick="showTab('barang')">Kelola Barang</button>
+            <button class="tab-btn" onclick="showTab('import')">Import Barang</button>
             <button class="tab-btn" onclick="showTab('voucher')">Redeem Voucher</button>
         </div>
 
@@ -268,6 +383,51 @@ $conn->close();
                         </tbody>
                     </table>
                 <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Tab Import Barang -->
+        <div id="tab-import" class="tab-content">
+            <div class="card">
+                <h2>Import Barang dari Spreadsheet</h2>
+                <p style="margin-bottom: 20px; color: #666;">
+                    <strong>Cara penggunaan:</strong><br>
+                    1. Copy data dari spreadsheet (Excel/Google Sheets)<br>
+                    2. Paste di textarea di bawah ini<br>
+                    3. Format: <strong>Nama Barang | Deskripsi | Harga | Stok | Status</strong><br>
+                    4. Dipisah dengan <strong>Tab</strong> atau <strong>Koma (,)</strong><br>
+                    5. Klik "Import Barang" untuk menyimpan ke database
+                </p>
+                
+                <div style="background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #667eea;">
+                    <strong>Contoh Format:</strong><br>
+                    <code style="display: block; margin-top: 8px; padding: 8px; background: white; border-radius: 4px;">
+                        Buku Tulis	Buku tulis 38 lembar	5000	100	aktif<br>
+                        Pensil 2B	Pensil 2B Faber Castell	3000	150	aktif<br>
+                        Penghapus	Penghapus Faber Castell	2000	200	nonaktif
+                    </code>
+                    <small style="color: #666; display: block; margin-top: 8px;">
+                        * Status: aktif atau nonaktif (default: aktif jika kosong)<br>
+                        * Harga bisa dengan format: 5000, Rp 5.000, atau 5000.00
+                    </small>
+                </div>
+                
+                <form method="POST">
+                    <input type="hidden" name="action" value="import_barang">
+                    
+                    <div class="form-group">
+                        <label>Paste Data dari Spreadsheet</label>
+                        <textarea 
+                            name="data_paste" 
+                            rows="15" 
+                            style="font-family: 'Courier New', monospace; font-size: 13px;"
+                            placeholder="Paste data dari spreadsheet di sini...&#10;&#10;Contoh:&#10;Buku Tulis	Buku tulis 38 lembar	5000	100	aktif&#10;Pensil 2B	Pensil 2B Faber Castell	3000	150	aktif"
+                            required
+                        ></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-success">Import Barang</button>
+                </form>
             </div>
         </div>
 
