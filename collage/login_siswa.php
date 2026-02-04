@@ -106,6 +106,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username_input = trim($_POST['username'] ?? '');
     $password_input = trim($_POST['password'] ?? '');
     $user_type_selected = trim($_POST['user_type'] ?? 'student'); // Default to student if not set
+    
+    // Debug: Log received data
+    error_log("Login attempt - Username: $username_input, Type: $user_type_selected");
 
     // Admin khusus
     if ($username_input === 'khalid' && $password_input === 'syakila') {
@@ -121,6 +124,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } else {
         $logged_in = false;
         $user_type = null;
+
+        // Debug log
+        error_log("Processing login - user_type_selected: $user_type_selected, username: $username_input");
 
         // Login berdasarkan tab yang dipilih
         switch ($user_type_selected) {
@@ -182,6 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $_SESSION['dosen_nama'] = 'Dosen Tester';
                     $logged_in = true;
                     $user_type = 'dosen';
+                    error_log("Hardcode login successful for dosen");
                 } else {
                     // Login sebagai Dosen dari database
                     $stmt = $conn->prepare("SELECT * FROM dosen WHERE username = ? AND password = ?");
@@ -232,6 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $_SESSION['keuangan_nama'] = 'Keuangan Tester';
                     $logged_in = true;
                     $user_type = 'keuangan';
+                    error_log("Hardcode login successful for keuangan");
                 } else {
                     // Login sebagai Keuangan dari database
                     $table_check = $conn->query("SHOW TABLES LIKE 'keuangan'");
@@ -290,8 +298,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
             
             if (!empty($redirect_url) && empty($error)) {
+                // Ensure no output before redirect
+                if (ob_get_length()) {
+                    ob_clean();
+                }
+                error_log("Redirecting to: " . $redirect_url . " for user_type: " . $user_type);
                 header("Location: " . $redirect_url);
                 exit();
+            } else {
+                error_log("Redirect failed - redirect_url: " . ($redirect_url ?? 'empty') . ", error: " . ($error ?? 'none') . ", logged_in: " . ($logged_in ? 'true' : 'false') . ", user_type: " . ($user_type ?? 'empty'));
             }
         } else {
             if (empty($error)) {
@@ -710,16 +725,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         
         // Ensure form submits with correct user_type
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            const activeTab = document.querySelector('.tab-content.active');
-            if (activeTab) {
-                const tabId = activeTab.id.replace('tab-', '');
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', function(e) {
+                // Get active tab
+                const activeTab = document.querySelector('.tab-content.active');
+                let tabId = 'student'; // default
+                
+                if (activeTab) {
+                    tabId = activeTab.id.replace('tab-', '');
+                } else {
+                    // Fallback: get from active tab button
+                    const activeBtn = document.querySelector('.tab-btn.active');
+                    if (activeBtn) {
+                        const tabText = activeBtn.textContent.trim().toLowerCase();
+                        const tabMap = {
+                            'siswa': 'student',
+                            'dosen': 'dosen',
+                            'admin': 'admin',
+                            'keuangan': 'keuangan'
+                        };
+                        if (tabMap[tabText]) {
+                            tabId = tabMap[tabText];
+                        }
+                    }
+                }
+                
+                // Update user_type input BEFORE form submits
                 const userTypeInput = document.getElementById('user_type');
                 if (userTypeInput) {
                     userTypeInput.value = tabId;
+                    console.log('Setting user_type to:', tabId);
                 }
-            }
-        });
+                
+                // Form will submit normally
+            });
+        }
     </script>
 </body>
 </html>
