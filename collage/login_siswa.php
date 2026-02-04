@@ -103,9 +103,9 @@ $device_id = $_GET['device_id'] ?? $_POST['device_id'] ?? null;
 $fcm_token = $_GET['token'] ?? $_POST['token'] ?? null;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $username_input = trim($_POST['username']);
-    $password_input = trim($_POST['password']);
-    $user_type_selected = trim($_POST['user_type'] ?? '');
+    $username_input = trim($_POST['username'] ?? '');
+    $password_input = trim($_POST['password'] ?? '');
+    $user_type_selected = trim($_POST['user_type'] ?? 'student'); // Default to student if not set
 
     // Admin khusus
     if ($username_input === 'khalid' && $password_input === 'syakila') {
@@ -257,7 +257,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $conn->close();
 
         // Redirect berdasarkan user type
-        if ($logged_in) {
+        if ($logged_in && !empty($user_type)) {
+            // Redirect based on user type
+            $redirect_url = '';
             switch ($user_type) {
                 case 'student':
                     $tab_map = [
@@ -267,20 +269,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         'absensi' => 'absensi'
                     ];
                     $redirect_tab = isset($tab_map[$action]) ? '?tab=' . $tab_map[$action] : '';
-                    header("Location: profile.php" . $redirect_tab);
-                    exit;
+                    $redirect_url = 'profile.php' . $redirect_tab;
+                    break;
+                    
                 case 'dosen':
-                    header('Location: dosen_absensi.php');
-                    exit;
+                    $redirect_url = 'dosen_absensi.php';
+                    break;
+                    
                 case 'admin':
-                    header('Location: adminbelanja.php');
-                    exit;
+                    $redirect_url = 'adminbelanja.php';
+                    break;
+                    
                 case 'keuangan':
-                    header('Location: keuangan_dashboard.php');
-                    exit;
+                    $redirect_url = 'keuangan_dashboard.php';
+                    break;
+                    
+                default:
+                    $error = "Tipe user tidak valid!";
+                    break;
+            }
+            
+            if (!empty($redirect_url) && empty($error)) {
+                header("Location: " . $redirect_url);
+                exit();
             }
         } else {
-            $error = "Username/ID atau Password salah!";
+            if (empty($error)) {
+                $error = "Username/ID atau Password salah!";
+            }
         }
     }
 }
@@ -671,13 +687,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             });
 
             // Show selected tab
-            document.getElementById('tab-' + tabName).classList.add('active');
+            const selectedTab = document.getElementById('tab-' + tabName);
+            if (selectedTab) {
+                selectedTab.classList.add('active');
+            }
+            
             if (buttonElement) {
                 buttonElement.classList.add('active');
             }
 
             // Update hidden input
-            document.getElementById('user_type').value = tabName;
+            const userTypeInput = document.getElementById('user_type');
+            if (userTypeInput) {
+                userTypeInput.value = tabName;
+            }
 
             // Focus on username input
             const usernameInput = document.querySelector('#tab-' + tabName + ' input[name="username"]');
@@ -685,6 +708,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 setTimeout(() => usernameInput.focus(), 100);
             }
         }
+        
+        // Ensure form submits with correct user_type
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            const activeTab = document.querySelector('.tab-content.active');
+            if (activeTab) {
+                const tabId = activeTab.id.replace('tab-', '');
+                const userTypeInput = document.getElementById('user_type');
+                if (userTypeInput) {
+                    userTypeInput.value = tabId;
+                }
+            }
+        });
     </script>
 </body>
 </html>
