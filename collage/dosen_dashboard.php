@@ -209,12 +209,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     continue;
                 }
                 
-                // Format: id, name, class, tingkat, spp_bulanan, tambahan, biayatambahan, password, phone_no, balance
+                // Format urutan: ID, Nama, Kelas, Tingkat, SPP Bulanan, Tambahan, Biaya Tambahan, Password, Phone No, Balance
                 if (count($cols) < 2) {
                     $errors[] = "Baris " . ($line_num + 1) . ": Data tidak lengkap (minimal: ID, Nama)";
                     continue;
                 }
                 
+                // Urutan: ID (kolom 0), Nama (kolom 1), kemudian kolom lainnya
                 $id = !empty($cols[0]) ? intval($cols[0]) : null;
                 $name = $cols[1] ?? '';
                 $class = $cols[2] ?? '';
@@ -804,13 +805,13 @@ try {
                         <textarea 
                             name="data_paste" 
                             id="data_paste" 
-                            placeholder="Format: ID, Nama, Kelas, Tingkat, SPP Bulanan, Tambahan, Biaya Tambahan, Password, Phone No, Balance&#10;&#10;Contoh:&#10;1001, Ahmad Zaki, X IPA 1, X, 500000, , , 123456, 081234567890, 0&#10;1002, Siti Nurhaliza, X IPA 1, X, 500000, , , 123456, 081234567891, 0"
+                            placeholder="Urutan: ID, Nama, Kelas, Tingkat, SPP Bulanan, Tambahan, Biaya Tambahan, Password, Phone No, Balance&#10;&#10;Contoh:&#10;1001, Ahmad Zaki, X IPA 1, X, 500000, , , 123456, 081234567890, 0&#10;1002, Siti Nurhaliza, X IPA 1, X, 500000, , , 123456, 081234567891, 0"
                             rows="10"
                             required
                         ></textarea>
                         <small style="color: #6b7280; font-size: 12px; display: block; margin-top: 4px;">
-                            <strong>Format:</strong> ID, Nama, Kelas, Tingkat, SPP Bulanan, Tambahan, Biaya Tambahan, Password, Phone No, Balance<br>
-                            <strong>Catatan:</strong> ID wajib diisi dan harus unik. Kolom yang tidak diisi bisa dikosongkan (biarkan kosong atau isi dengan koma).
+                            <strong>Urutan Format:</strong> <strong>ID, Nama</strong>, Kelas, Tingkat, SPP Bulanan, Tambahan, Biaya Tambahan, Password, Phone No, Balance<br>
+                            <strong>Catatan:</strong> <strong>ID harus diisi manual oleh dosen</strong> dan harus unik. Kolom setelah Nama bisa dikosongkan (biarkan kosong atau isi dengan koma).
                         </small>
                     </div>
 
