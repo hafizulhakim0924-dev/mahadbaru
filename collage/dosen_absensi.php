@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         }
         $stmt->close();
     } elseif ($_POST['action'] == 'import_students') {
-        // Import students massal dari spreadsheet
+        // Import students massal dengan ID manual
         $data_paste = trim($_POST['data_paste'] ?? '');
         
         if (empty($data_paste)) {
@@ -71,35 +71,62 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 $cols = array_map('trim', $cols);
                 
                 // Skip header
-                if ($line_num == 0 && (strtolower($cols[0]) == 'name' || strtolower($cols[0]) == 'nama' || strtolower($cols[0]) == 'id')) {
+                if ($line_num == 0 && (strtolower($cols[0]) == 'id' || strtolower($cols[0]) == 'name' || strtolower($cols[0]) == 'nama')) {
                     continue;
                 }
                 
-                // Format: name, class, phone_no, password (minimal name dan class)
+                // Format urutan: ID, Nama, Kelas, Tingkat, SPP Bulanan, Tambahan, Biaya Tambahan, Password, Phone No, Balance
                 if (count($cols) < 2) {
-                    $errors[] = "Baris " . ($line_num + 1) . ": Data tidak lengkap (minimal: Nama, Kelas)";
+                    $errors[] = "Baris " . ($line_num + 1) . ": Data tidak lengkap (minimal: ID, Nama)";
                     continue;
                 }
                 
-                $name = $cols[0] ?? '';
-                $class = $cols[1] ?? '';
-                $phone_no = $cols[2] ?? '';
-                $password = $cols[3] ?? '123456'; // Default password
-                $tingkat = $cols[4] ?? '';
-                $spp_bulanan = isset($cols[5]) ? intval($cols[5]) : 0;
+                // Urutan: ID (kolom 0), Nama (kolom 1), kemudian kolom lainnya
+                $id = !empty($cols[0]) ? intval($cols[0]) : null;
+                $name = $cols[1] ?? '';
+                $class = $cols[2] ?? '';
+                $tingkat = $cols[3] ?? '';
+                $spp_bulanan = isset($cols[4]) && $cols[4] !== '' ? intval($cols[4]) : null;
+                $tambahan = $cols[5] ?? '';
+                $biayatambahan = isset($cols[6]) && $cols[6] !== '' ? intval($cols[6]) : null;
+                $password = $cols[7] ?? '123456'; // Default password
+                $phone_no = isset($cols[8]) && $cols[8] !== '' ? $cols[8] : null;
+                $balance = isset($cols[9]) && $cols[9] !== '' ? intval($cols[9]) : null;
                 
-                if (empty($name) || empty($class)) {
-                    $errors[] = "Baris " . ($line_num + 1) . ": Nama dan Kelas tidak boleh kosong";
+                if (empty($name)) {
+                    $errors[] = "Baris " . ($line_num + 1) . ": Nama tidak boleh kosong";
                     continue;
                 }
+                
+                if ($id === null || $id <= 0) {
+                    $errors[] = "Baris " . ($line_num + 1) . ": ID harus diisi dan berupa angka positif";
+                    continue;
+                }
+                
+                // Cek apakah ID sudah ada
+                $stmt_check = $conn->prepare("SELECT id FROM students WHERE id = ?");
+                $stmt_check->bind_param("i", $id);
+                $stmt_check->execute();
+                $result_check = $stmt_check->get_result();
+                
+                if ($result_check->num_rows > 0) {
+                    $errors[] = "Baris " . ($line_num + 1) . ": ID $id sudah terdaftar";
+                    $stmt_check->close();
+                    continue;
+                }
+                $stmt_check->close();
                 
                 $students_data[] = [
+                    'id' => $id,
                     'name' => $name,
                     'class' => $class,
-                    'phone_no' => $phone_no,
-                    'password' => $password,
                     'tingkat' => $tingkat,
-                    'spp_bulanan' => $spp_bulanan
+                    'spp_bulanan' => $spp_bulanan,
+                    'tambahan' => $tambahan,
+                    'biayatambahan' => $biayatambahan,
+                    'password' => $password,
+                    'phone_no' => $phone_no,
+                    'balance' => $balance
                 ];
             }
             
@@ -108,48 +135,97 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 $conn->begin_transaction();
                 
                 try {
-                    // Cek struktur tabel students
-                    $table_check = $conn->query("SHOW COLUMNS FROM students LIKE 'tingkat'");
-                    $has_tingkat = $table_check && $table_check->num_rows > 0;
-                    
-                    if ($has_tingkat) {
-                        $stmt = $conn->prepare("INSERT INTO students (name, class, phone_no, password, tingkat, spp_bulanan) VALUES (?, ?, ?, ?, ?, ?)");
-                    } else {
-                        $stmt = $conn->prepare("INSERT INTO students (name, class, phone_no, password) VALUES (?, ?, ?, ?)");
-                    }
-                    
                     foreach ($students_data as $data) {
-                        if ($has_tingkat) {
-                            $stmt->bind_param("sssssi", $data['name'], $data['class'], $data['phone_no'], $data['password'], $data['tingkat'], $data['spp_bulanan']);
-                        } else {
-                            $stmt->bind_param("ssss", $data['name'], $data['class'], $data['phone_no'], $data['password']);
+                        // Build query dengan ID manual (harus selalu include id)
+                        $fields = ['id', 'name'];
+                        $values = [$data['id'], $data['name']];
+                        $types = 'is';
+                        $placeholders = '?,?';
+                        
+                        // Tambahkan kolom yang tidak kosong
+                        if (!empty($data['class'])) {
+                            $fields[] = 'class';
+                            $values[] = $data['class'];
+                            $types .= 's';
+                            $placeholders .= ',?';
+                        }
+                        if (!empty($data['tingkat'])) {
+                            $fields[] = 'tingkat';
+                            $values[] = $data['tingkat'];
+                            $types .= 's';
+                            $placeholders .= ',?';
+                        }
+                        if ($data['spp_bulanan'] !== null) {
+                            $fields[] = 'spp_bulanan';
+                            $values[] = $data['spp_bulanan'];
+                            $types .= 'i';
+                            $placeholders .= ',?';
+                        }
+                        if (!empty($data['tambahan'])) {
+                            $fields[] = 'tambahan';
+                            $values[] = $data['tambahan'];
+                            $types .= 's';
+                            $placeholders .= ',?';
+                        }
+                        if ($data['biayatambahan'] !== null) {
+                            $fields[] = 'biayatambahan';
+                            $values[] = $data['biayatambahan'];
+                            $types .= 'i';
+                            $placeholders .= ',?';
+                        }
+                        if (!empty($data['password'])) {
+                            $fields[] = 'password';
+                            $values[] = $data['password'];
+                            $types .= 's';
+                            $placeholders .= ',?';
+                        }
+                        if ($data['phone_no'] !== null && $data['phone_no'] !== '') {
+                            $fields[] = 'phone_no';
+                            $values[] = $data['phone_no'];
+                            $types .= 's';
+                            $placeholders .= ',?';
+                        }
+                        if ($data['balance'] !== null) {
+                            $fields[] = 'balance';
+                            $values[] = $data['balance'];
+                            $types .= 'i';
+                            $placeholders .= ',?';
                         }
                         
-                        if ($stmt->execute()) {
-                            $success_count++;
+                        // Gunakan INSERT dengan ID eksplisit (akan override AUTO_INCREMENT jika ID belum ada)
+                        $sql = "INSERT INTO students (" . implode(', ', $fields) . ") VALUES (" . $placeholders . ")";
+                        $stmt = $conn->prepare($sql);
+                        
+                        if ($stmt) {
+                            $stmt->bind_param($types, ...$values);
+                            
+                            if ($stmt->execute()) {
+                                $success_count++;
+                            } else {
+                                $errors[] = "Gagal insert ID {$data['id']} ({$data['name']}): " . $stmt->error;
+                            }
+                            $stmt->close();
                         } else {
-                            $errors[] = "Gagal insert: " . $data['name'] . " - " . $stmt->error;
+                            $errors[] = "Gagal prepare query untuk ID {$data['id']}: " . $conn->error;
                         }
                     }
-                    
-                    $stmt->close();
                     
                     if ($success_count > 0) {
                         $conn->commit();
                         $success = "Berhasil mengimport $success_count siswa!";
                         if (!empty($errors)) {
-                            $error = "Beberapa data gagal diimport:<br>" . implode("<br>", array_map('htmlspecialchars', $errors));
+                            $error = "Beberapa data gagal diimport:<br>" . implode("<br>", array_map('htmlspecialchars', array_slice($errors, 0, 10)));
                         }
                     } else {
                         $conn->rollback();
-                        $error = "Tidak ada data yang berhasil diimport.<br>" . implode("<br>", array_map('htmlspecialchars', $errors));
+                        $error = "Tidak ada data yang berhasil diimport.<br>" . implode("<br>", array_map('htmlspecialchars', array_slice($errors, 0, 10)));
                     }
                 } catch (Exception $e) {
                     $conn->rollback();
                     $error = "Error: " . $e->getMessage();
                 }
             } else {
-                $error = "Tidak ada data valid untuk diimport.<br>" . implode("<br>", array_map('htmlspecialchars', $errors));
+                $error = "Tidak ada data valid untuk diimport.<br>" . implode("<br>", array_map('htmlspecialchars', array_slice($errors, 0, 10)));
             }
         }
     } elseif ($_POST['action'] == 'import_tagihan') {
@@ -484,23 +560,18 @@ $stmt->close();
             <div class="card">
                 <h2>Import Students Massal</h2>
                 <p style="margin-bottom: 20px; color: #666;">
-                    <strong>Cara penggunaan:</strong><br>
-                    1. Copy data dari spreadsheet (Excel/Google Sheets)<br>
-                    2. Paste di textarea di bawah ini<br>
-                    3. Format: <strong>Nama | Kelas | Phone No | Password | Tingkat | SPP Bulanan</strong><br>
-                    4. Dipisah dengan <strong>Tab</strong> atau <strong>Koma (,)</strong><br>
-                    5. Minimal: Nama dan Kelas (Password default: 123456 jika kosong)
+                    Import siswa secara massal dengan format CSV. <strong>ID harus diisi manual oleh dosen</strong> sebelum nama.
                 </p>
                 
                 <div style="background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #667eea;">
-                    <strong>Contoh Format:</strong><br>
+                    <strong>Urutan Format:</strong> <strong>ID, Nama</strong>, Kelas, Tingkat, SPP Bulanan, Tambahan, Biaya Tambahan, Password, Phone No, Balance<br>
                     <code style="display: block; margin-top: 8px; padding: 8px; background: white; border-radius: 4px; font-size: 12px;">
-                        Ahmad Fauzi	XII IPA 1	081234567890	123456	XII	500000<br>
-                        Siti Nurhaliza	XI IPS 1	081234567891	123456	XI	450000<br>
-                        Budi Santoso	X IPA 1	081234567892	123456	X	400000
+                        1001, Ahmad Zaki, X IPA 1, X, 500000, , , 123456, 081234567890, 0<br>
+                        1002, Siti Nurhaliza, X IPA 1, X, 500000, , , 123456, 081234567891, 0<br>
+                        1003, Budi Santoso, XI IPS 1, XI, 450000, , , 123456, 081234567892, 0
                     </code>
                     <small style="color: #666; display: block; margin-top: 8px;">
-                        * Kolom: Nama, Kelas, Phone No (opsional), Password (opsional, default: 123456), Tingkat (opsional), SPP Bulanan (opsional)
+                        <strong>Catatan:</strong> <strong>ID harus diisi manual oleh dosen</strong> dan harus unik. Kolom setelah Nama bisa dikosongkan (biarkan kosong atau isi dengan koma).
                     </small>
                 </div>
                 
@@ -513,9 +584,13 @@ $stmt->close();
                             name="data_paste" 
                             rows="15" 
                             style="font-family: 'Courier New', monospace; font-size: 13px;"
-                            placeholder="Paste data dari spreadsheet di sini...&#10;&#10;Contoh:&#10;Ahmad Fauzi	XII IPA 1	081234567890	123456	XII	500000"
+                            placeholder="Urutan: ID, Nama, Kelas, Tingkat, SPP Bulanan, Tambahan, Biaya Tambahan, Password, Phone No, Balance&#10;&#10;Contoh:&#10;1001, Ahmad Zaki, X IPA 1, X, 500000, , , 123456, 081234567890, 0&#10;1002, Siti Nurhaliza, X IPA 1, X, 500000, , , 123456, 081234567891, 0"
                             required
                         ></textarea>
+                        <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">
+                            <strong>Urutan Format:</strong> <strong>ID, Nama</strong>, Kelas, Tingkat, SPP Bulanan, Tambahan, Biaya Tambahan, Password, Phone No, Balance<br>
+                            <strong>Catatan:</strong> <strong>ID harus diisi manual oleh dosen</strong> dan harus unik. Kolom setelah Nama bisa dikosongkan (biarkan kosong atau isi dengan koma).
+                        </small>
                     </div>
 
                     <button type="submit" class="btn">Import Students</button>
