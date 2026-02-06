@@ -3,8 +3,8 @@ session_start();
 
 // Database Config
 $servername = "localhost";
-$username = "ypikhair_admin";
-$password = "hakim123123123";
+$username = "adminmahadzubair";
+$password = "Hakim123!";
 $dbname = "ypikhair_mahadzubair";
 
 // Check if dosen is logged in - redirect to unified login if not
