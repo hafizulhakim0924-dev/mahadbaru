@@ -3,7 +3,7 @@ session_start();
 
 // Database Config
 $servername = "localhost";
-$username = "adminmahadzubair";
+$username = "ypikhair_adminmahadzubair";
 $password = "Hakim123!";
 $dbname = "ypikhair_mahadzubair";
 
