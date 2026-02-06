@@ -5,7 +5,7 @@ session_start();
 $servername = "localhost";
 $username = "ypikhair_admin";
 $password = "hakim123123123";
-$dbname = "ypikhair_datautama";
+$dbname = "ypikhair_mahadzubair";
 
 // Check if dosen is logged in - redirect to unified login if not
 if (!isset($_SESSION['dosen_id'])) {
