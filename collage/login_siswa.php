@@ -3,9 +3,9 @@ session_start();
 
 // Database Config
 $servername = "localhost";
-$username = "ypikhair_admin";
-$password = "hakim123123123";
-$dbname = "ypikhair_datautama";
+$username = "ypikhair_adminmahadzubair";
+$password = "Hakim123!";
+$dbname = "ypikhair_mahadzubair";
 
 // Redirect jika sudah login
 if (isset($_SESSION['student']['id']) || isset($_SESSION['user_id'])) {
@@ -66,36 +66,48 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $error = "Superadmin hanya bisa login sebagai Admin, Dosen, atau Keuangan!";
                 }
             } elseif ($user_type == 'student') {
-                // Login sebagai siswa (gunakan ID atau phone_no)
-                $login_field = is_numeric($login_id) ? 'id' : 'phone_no';
-                $stmt = $conn->prepare("SELECT * FROM students WHERE $login_field = ?");
-                $stmt->bind_param("s", $login_id);
-                $stmt->execute();
-                $result = $stmt->get_result();
+                // Login sebagai siswa menggunakan database ypikhair_mahadzubair
+                // Gunakan koneksi khusus untuk siswa
+                $student_conn = new mysqli($servername, $username, $password, $dbname);
                 
-                if ($result->num_rows > 0) {
-                    $student = $result->fetch_assoc();
-                    
-                    // Check password (plain text comparison, bisa diganti dengan password_verify jika menggunakan hash)
-                    if ($student['password'] === $login_password) {
-                        // Set session
-                        $_SESSION['student']['id'] = $student['id'];
-                        $_SESSION['student']['name'] = $student['name'];
-                        $_SESSION['user_id'] = $student['id']; // Compatibility
-                        $_SESSION['last_activity'] = time();
-                        
-                        $stmt->close();
-                        $conn->close();
-                        
-                        header('Location: profile.php');
-                        exit;
-                    } else {
-                        $error = "Password salah!";
-                    }
+                if ($student_conn->connect_error) {
+                    $error = "Koneksi database gagal!";
                 } else {
-                    $error = "ID/Username tidak ditemukan!";
+                    $student_conn->set_charset("utf8mb4");
+                    
+                    // Login siswa hanya menggunakan ID dan password (dari database ypikhair_mahadzubair)
+                    $stmt = $student_conn->prepare("SELECT * FROM students WHERE id = ?");
+                    $login_id_int = intval($login_id);
+                    $stmt->bind_param("i", $login_id_int);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    
+                    if ($result->num_rows > 0) {
+                        $student = $result->fetch_assoc();
+                        
+                        // Check password (plain text comparison)
+                        if ($student['password'] === $login_password) {
+                            // Set session
+                            $_SESSION['student']['id'] = $student['id'];
+                            $_SESSION['student']['name'] = $student['name'];
+                            $_SESSION['user_id'] = $student['id']; // Compatibility
+                            $_SESSION['last_activity'] = time();
+                            
+                            $stmt->close();
+                            $student_conn->close();
+                            $conn->close();
+                            
+                            header('Location: profile.php');
+                            exit;
+                        } else {
+                            $error = "Password salah!";
+                        }
+                    } else {
+                        $error = "ID tidak ditemukan!";
+                    }
+                    $stmt->close();
+                    $student_conn->close();
                 }
-                $stmt->close();
             } elseif ($user_type == 'dosen') {
                 // Login sebagai dosen
                 $stmt = $conn->prepare("SELECT * FROM dosen WHERE username = ? OR id = ?");

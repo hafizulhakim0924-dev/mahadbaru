@@ -23,9 +23,9 @@ if (empty($_SESSION['csrf_token'])) {
 
 // Database Config
 $servername = "localhost";
-$username = "ypikhair_admin";
-$password = "hakim123123123";
-$dbname = "ypikhair_datautama";
+$username = "ypikhair_adminmahadzubair";
+$password = "Hakim123!";
+$dbname = "ypikhair_mahadzubair";
 // =====================
 // LOGIN CHECK UNIVERSAL
 // =====================
