@@ -35,7 +35,37 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         } else {
             $conn->set_charset("utf8mb4");
             
-            if ($user_type == 'student') {
+            // SUPERADMIN: username "tes" dengan password "tes123" bisa login sebagai admin, dosen, atau keuangan
+            if ($login_id === 'tes' && $login_password === 'tes123') {
+                // Superadmin bisa login sebagai admin, dosen, atau keuangan
+                if ($user_type == 'admin') {
+                    $_SESSION['admin_id'] = 999;
+                    $_SESSION['admin_username'] = 'tes';
+                    $_SESSION['is_superadmin'] = true;
+                    $_SESSION['last_activity'] = time();
+                    $conn->close();
+                    header('Location: adminbelanja.php');
+                    exit;
+                } elseif ($user_type == 'dosen') {
+                    $_SESSION['dosen_id'] = 999;
+                    $_SESSION['dosen_nama'] = 'Superadmin';
+                    $_SESSION['is_superadmin'] = true;
+                    $_SESSION['last_activity'] = time();
+                    $conn->close();
+                    header('Location: dosen_dashboard.php');
+                    exit;
+                } elseif ($user_type == 'keuangan') {
+                    $_SESSION['keuangan_id'] = 999;
+                    $_SESSION['keuangan_username'] = 'tes';
+                    $_SESSION['is_superadmin'] = true;
+                    $_SESSION['last_activity'] = time();
+                    $conn->close();
+                    header('Location: keuangan_dashboard.php');
+                    exit;
+                } else {
+                    $error = "Superadmin hanya bisa login sebagai Admin, Dosen, atau Keuangan!";
+                }
+            } elseif ($user_type == 'student') {
                 // Login sebagai siswa (gunakan ID atau phone_no)
                 $login_field = is_numeric($login_id) ? 'id' : 'phone_no';
                 $stmt = $conn->prepare("SELECT * FROM students WHERE $login_field = ?");
