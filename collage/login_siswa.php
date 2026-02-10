@@ -66,8 +66,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $error = "Superadmin hanya bisa login sebagai Admin, Dosen, atau Keuangan!";
                 }
             } elseif ($user_type == 'student') {
-                // Login sebagai siswa menggunakan database ypikhair_mahadzubair
-                // Gunakan koneksi khusus untuk siswa
+                // Login sebagai siswa menggunakan database ypikhair_mahadzubair dan table students
+                // Database: ypikhair_mahadzubair
+                // Table: students
                 $student_conn = new mysqli($servername, $username, $password, $dbname);
                 
                 if ($student_conn->connect_error) {
@@ -75,7 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 } else {
                     $student_conn->set_charset("utf8mb4");
                     
-                    // Login siswa hanya menggunakan ID dan password (dari database ypikhair_mahadzubair)
+                    // Login siswa menggunakan ID dan password dari table students
+                    // Database: ypikhair_mahadzubair, Table: students
                     $stmt = $student_conn->prepare("SELECT * FROM students WHERE id = ?");
                     $login_id_int = intval($login_id);
                     $stmt->bind_param("i", $login_id_int);
@@ -90,12 +92,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             // Set session
                             $_SESSION['student']['id'] = $student['id'];
                             $_SESSION['student']['name'] = $student['name'];
+                            $_SESSION['student']['class'] = $student['class'] ?? '';
                             $_SESSION['user_id'] = $student['id']; // Compatibility
                             $_SESSION['last_activity'] = time();
                             
                             $stmt->close();
                             $student_conn->close();
-                            $conn->close();
                             
                             header('Location: profile.php');
                             exit;
@@ -191,7 +193,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $stmt->close();
             }
             
-            $conn->close();
+            if (isset($conn)) {
+                $conn->close();
+            }
         }
     }
 }
