@@ -340,21 +340,41 @@ try {
 
 // Get student bills (tagihan)
 $stmt = $conn->prepare("SELECT * FROM tagihan WHERE student_id = ? ORDER BY id ASC");
-$stmt->bind_param("i", $student_id);
-$stmt->execute();
-$result = $stmt->get_result();
-
-$student_bills = [];
-while ($row = $result->fetch_assoc()) {
-    $student_bills[$row['nama_tagihan']] = floatval($row['jumlah']);
+if (!$stmt) {
+    error_log("Error preparing tagihan query: " . $conn->error);
+    $student_bills = [];
+} else {
+    $stmt->bind_param("i", $student_id);
+    if (!$stmt->execute()) {
+        error_log("Error executing tagihan query: " . $stmt->error);
+        $student_bills = [];
+    } else {
+        $result = $stmt->get_result();
+        $student_bills = [];
+        while ($row = $result->fetch_assoc()) {
+            $student_bills[$row['nama_tagihan']] = floatval($row['jumlah']);
+        }
+    }
+    $stmt->close();
 }
-$stmt->close();
 
 // Get tagihan history from tagihan_history table
 function getTagihanHistory($conn, $student_id) {
+    // Cek apakah tabel tagihan_history ada, jika tidak return array kosong
     $stmt = $conn->prepare("SELECT * FROM tagihan_history WHERE student_id = ? ORDER BY created_at DESC");
+    if (!$stmt) {
+        // Jika tabel tidak ada, return array kosong (tidak error)
+        error_log("Warning: tagihan_history table may not exist or query failed: " . $conn->error);
+        return [];
+    }
+    
     $stmt->bind_param("i", $student_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error executing tagihan_history query: " . $stmt->error);
+        $stmt->close();
+        return [];
+    }
+    
     $result = $stmt->get_result();
     
     $history = [];
@@ -1638,13 +1658,17 @@ input, textarea, select {
                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
                             
                             <?php foreach ($unpaid_bills as $bill => $amount): 
+                                $tanggal_ditambahkan = null;
                                 $stmt = $conn->prepare("SELECT created_at FROM tagihan_history WHERE student_id = ? AND nama_tagihan = ? ORDER BY created_at ASC LIMIT 1");
-                                $stmt->bind_param("is", $student_id, $bill);
-                                $stmt->execute();
-                                $result = $stmt->get_result();
-                                $history_row = $result->fetch_assoc();
-                                $stmt->close();
-                                $tanggal_ditambahkan = $history_row ? date('d/m/Y H:i', strtotime($history_row['created_at'])) : null;
+                                if ($stmt) {
+                                    $stmt->bind_param("is", $student_id, $bill);
+                                    if ($stmt->execute()) {
+                                        $result = $stmt->get_result();
+                                        $history_row = $result->fetch_assoc();
+                                        $tanggal_ditambahkan = $history_row ? date('d/m/Y H:i', strtotime($history_row['created_at'])) : null;
+                                    }
+                                    $stmt->close();
+                                }
                             ?>
                                 <div class="bill-item" onclick="toggleBill('<?= htmlspecialchars($bill) ?>')">
                                     <label style="cursor: pointer; display: block;">
