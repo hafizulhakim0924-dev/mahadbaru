@@ -1,4 +1,9 @@
 <?php
+// Enable error reporting for debugging (disable in production)
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
 session_start();
 // Session security
 if (!isset($_SESSION['initiated'])) {
@@ -143,32 +148,50 @@ function createTripayPayment($amount, $order_id, $customer_name, $customer_email
 
 // Get student data from database
 // Mengambil semua field dari tabel students sesuai struktur yang ada
-$stmt = $conn->prepare("SELECT id, name, class, tingkat, spp_bulanan, tambahan, biayatambahan, password, phone_no, balance FROM students WHERE id = ?");
-$stmt->bind_param("i", $student_id);
-$stmt->execute();
-$result = $stmt->get_result();
-$student = $result->fetch_assoc();
-$stmt->close();
-
-if (!$student) {
+try {
+    $stmt = $conn->prepare("SELECT * FROM students WHERE id = ?");
+    if (!$stmt) {
+        error_log("Prepare failed: " . $conn->error);
+        throw new Exception("Database query preparation failed");
+    }
+    
+    $stmt->bind_param("i", $student_id);
+    if (!$stmt->execute()) {
+        error_log("Execute failed: " . $stmt->error);
+        throw new Exception("Database query execution failed");
+    }
+    
+    $result = $stmt->get_result();
+    $student_raw = $result->fetch_assoc();
+    $stmt->close();
+    
+    if (!$student_raw) {
+        session_destroy();
+        header('Location: login_siswa.php?error=invalid');
+        exit;
+    }
+    
+    // Normalize student data - pastikan semua field memiliki nilai default jika NULL
+    // Sesuai struktur tabel: id, name, class, tingkat, spp_bulanan, tambahan, biayatambahan, password, phone_no, balance
+    $student = [
+        'id' => intval($student_raw['id'] ?? 0),
+        'name' => trim($student_raw['name'] ?? ''),
+        'class' => trim($student_raw['class'] ?? ''),
+        'tingkat' => trim($student_raw['tingkat'] ?? ''),
+        'spp_bulanan' => ($student_raw['spp_bulanan'] ?? null) !== null ? intval($student_raw['spp_bulanan']) : null,
+        'tambahan' => trim($student_raw['tambahan'] ?? ''),
+        'biayatambahan' => ($student_raw['biayatambahan'] ?? null) !== null ? intval($student_raw['biayatambahan']) : null,
+        'password' => $student_raw['password'] ?? '',
+        'phone_no' => $student_raw['phone_no'] ?? null,
+        'balance' => ($student_raw['balance'] ?? null) !== null ? intval($student_raw['balance']) : null
+    ];
+    
+} catch (Exception $e) {
+    error_log('Error fetching student data [' . date('Y-m-d H:i:s') . ']: ' . $e->getMessage());
     session_destroy();
-    header('Location: login_siswa.php?error=invalid');
+    header('Location: login_siswa.php?error=database');
     exit;
 }
-
-// Normalize student data - pastikan semua field memiliki nilai default jika NULL
-$student = [
-    'id' => intval($student['id'] ?? 0),
-    'name' => $student['name'] ?? '',
-    'class' => $student['class'] ?? '',
-    'tingkat' => $student['tingkat'] ?? '',
-    'spp_bulanan' => $student['spp_bulanan'] ?? null,
-    'tambahan' => $student['tambahan'] ?? '',
-    'biayatambahan' => $student['biayatambahan'] ?? null,
-    'password' => $student['password'] ?? '',
-    'phone_no' => $student['phone_no'] ?? null,
-    'balance' => $student['balance'] ?? null
-];
 
 // Get student bills (tagihan)
 $stmt = $conn->prepare("SELECT * FROM tagihan WHERE student_id = ? ORDER BY id ASC");
@@ -282,11 +305,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 // Create Tripay payment
                 $customer_email = (!empty($student['phone_no']) && $student['phone_no'] !== null) ? $student['phone_no'] . '@example.com' : 'student' . $student_id . '@example.com';
+                $student_name = !empty($student['name']) ? $student['name'] : 'Siswa';
                 
                 $tripay_response = createTripayPayment(
                     $total,
                     $order_id,
-                    $student['name'],
+                    $student_name,
                     $customer_email,
                     $method
                 );
@@ -344,11 +368,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      tripay_ref, pay_code, pay_url, qr_string, instructions) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?)");
                 
+                $student_name = !empty($student['name']) ? $student['name'] : '';
+                $student_class = !empty($student['class']) ? $student['class'] : '';
+                
                 $stmt->bind_param("sissssdssssssssss", 
                     $payment_id,
                     $student_id,
-                    $student['name'],
-                    $student['class'],
+                    $student_name,
+                    $student_class,
                     $tagihan_str,
                     $tagihan_detail_json,
                     $total,
