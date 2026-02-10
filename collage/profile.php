@@ -1,8 +1,148 @@
 <?php
-// Enable error reporting for debugging (disable in production)
+// Enable error reporting for debugging
 error_reporting(E_ALL);
-ini_set('display_errors', 0);
+ini_set('display_errors', 1); // Tampilkan error di halaman
 ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/error_log_profile.txt'); // Log ke file khusus
+
+// Set error handler global
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    if (!(error_reporting() & $errno)) {
+        return false;
+    }
+    
+    $error_msg = "PHP Error [$errno]: $errstr";
+    $error_details = "File: $errfile\nLine: $errline";
+    
+    error_log("PHP Error: $error_msg in $errfile on line $errline");
+    displayError($error_msg, $error_details);
+    
+    return true;
+});
+
+// Set exception handler
+set_exception_handler(function($exception) {
+    $error_msg = "Uncaught Exception: " . $exception->getMessage();
+    $error_details = "File: " . $exception->getFile() . "\nLine: " . $exception->getLine() . "\n\nStack Trace:\n" . $exception->getTraceAsString();
+    
+    error_log("Uncaught Exception: " . $exception->getMessage());
+    error_log("Stack trace: " . $exception->getTraceAsString());
+    displayError($error_msg, $error_details);
+});
+
+// Function untuk menampilkan error dengan format yang rapi
+function displayError($message, $details = '') {
+    echo '<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error - Profile</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 0;
+        }
+        .error-container {
+            max-width: 800px;
+            margin: 50px auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .error-header {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .error-header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .error-body {
+            padding: 30px;
+        }
+        .error-message {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .error-message strong {
+            color: #dc2626;
+            display: block;
+            margin-bottom: 10px;
+        }
+        .error-details {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .back-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #ef4444;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .back-button:hover {
+            background: #dc2626;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-header">
+            <h1>⚠️ Error Terjadi</h1>
+        </div>
+        <div class="error-body">
+            <div class="error-message">
+                <strong>Pesan Error:</strong>
+                ' . htmlspecialchars($message) . '
+            </div>';
+    
+    if (!empty($details)) {
+        echo '<div class="error-details">' . htmlspecialchars($details) . '</div>';
+    }
+    
+    echo '
+            <a href="login_siswa.php" class="back-button">Kembali ke Login</a>';
+    
+    // Tampilkan error log terakhir jika ada
+    $error_log_file = __DIR__ . '/error_log_profile.txt';
+    if (file_exists($error_log_file)) {
+        $log_content = file_get_contents($error_log_file);
+        $log_lines = explode("\n", $log_content);
+        $recent_logs = array_slice($log_lines, -20); // Ambil 20 baris terakhir
+        if (!empty($recent_logs)) {
+            echo '<div style="margin-top: 20px;">
+                <strong>Error Log Terakhir:</strong>
+                <div class="error-details" style="margin-top: 10px;">' . htmlspecialchars(implode("\n", $recent_logs)) . '</div>
+            </div>';
+        }
+    }
+    
+    echo '
+        </div>
+    </div>
+</body>
+</html>';
+    exit;
+}
 
 session_start();
 // Session security
@@ -58,13 +198,16 @@ try {
     $conn = new mysqli($servername, $username, $password, $dbname);
     
     if ($conn->connect_error) {
-        throw new Exception("Connection failed: " . $conn->connect_error);
+        $error_msg = "Koneksi database gagal: " . $conn->connect_error;
+        error_log('DB Connection Error [' . date('Y-m-d H:i:s') . ']: ' . $error_msg);
+        displayError($error_msg, "Server: $servername\nDatabase: $dbname\nUsername: $username");
     }
     
     $conn->set_charset("utf8mb4");
 } catch (Exception $e) {
-    error_log('DB Connection Error [' . date('Y-m-d H:i:s') . ']: ' . $e->getMessage());
-    die('<!DOCTYPE html><html><head><title>Error</title></head><body style="font-family:sans-serif;text-align:center;padding:50px;"><h2>Sistem Sedang Dalam Perbaikan</h2><p>Silakan coba beberapa saat lagi atau hubungi administrator.</p></body></html>');
+    $error_msg = "Error koneksi database: " . $e->getMessage();
+    error_log('DB Connection Error [' . date('Y-m-d H:i:s') . ']: ' . $error_msg);
+    displayError($error_msg, $e->getTraceAsString());
 }
 
 
@@ -151,14 +294,16 @@ function createTripayPayment($amount, $order_id, $customer_name, $customer_email
 try {
     $stmt = $conn->prepare("SELECT * FROM students WHERE id = ?");
     if (!$stmt) {
-        error_log("Prepare failed: " . $conn->error);
-        throw new Exception("Database query preparation failed");
+        $error_msg = "Database query preparation failed: " . $conn->error;
+        error_log("Prepare failed: " . $error_msg);
+        displayError($error_msg, "SQL Query: SELECT * FROM students WHERE id = $student_id\nMySQL Error: " . $conn->error);
     }
     
     $stmt->bind_param("i", $student_id);
     if (!$stmt->execute()) {
-        error_log("Execute failed: " . $stmt->error);
-        throw new Exception("Database query execution failed");
+        $error_msg = "Database query execution failed: " . $stmt->error;
+        error_log("Execute failed: " . $error_msg);
+        displayError($error_msg, "SQL Query: SELECT * FROM students WHERE id = $student_id\nMySQL Error: " . $stmt->error);
     }
     
     $result = $stmt->get_result();
@@ -187,10 +332,10 @@ try {
     ];
     
 } catch (Exception $e) {
-    error_log('Error fetching student data [' . date('Y-m-d H:i:s') . ']: ' . $e->getMessage());
-    session_destroy();
-    header('Location: login_siswa.php?error=database');
-    exit;
+    $error_msg = 'Error mengambil data siswa: ' . $e->getMessage();
+    error_log('Error fetching student data [' . date('Y-m-d H:i:s') . ']: ' . $error_msg);
+    error_log('Stack trace: ' . $e->getTraceAsString());
+    displayError($error_msg, "Student ID: $student_id\n\nStack Trace:\n" . $e->getTraceAsString());
 }
 
 // Get student bills (tagihan)
@@ -669,8 +814,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } catch (Exception $e) {
-        error_log('Payment processing error for student ' . $student_id . ': ' . $e->getMessage());
-        $response['message'] = $e->getMessage();
+        $error_msg = 'Error processing payment: ' . $e->getMessage();
+        error_log('Payment processing error for student ' . $student_id . ': ' . $error_msg);
+        error_log('Stack trace: ' . $e->getTraceAsString());
+        $response['message'] = $error_msg;
+        $response['error_details'] = $e->getTraceAsString();
     }
     
     header('Content-Type: application/json');
