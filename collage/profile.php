@@ -62,24 +62,6 @@ try {
     die('<!DOCTYPE html><html><head><title>Error</title></head><body style="font-family:sans-serif;text-align:center;padding:50px;"><h2>Sistem Sedang Dalam Perbaikan</h2><p>Silakan coba beberapa saat lagi atau hubungi administrator.</p></body></html>');
 }
 
-// =====================
-// FIX LOGIN CHECK
-// =====================
-if (!isset($_SESSION['student']['id']) && !isset($_SESSION['user_id'])) {
-    header('Location: login_siswa.php');
-    exit;
-}
-
-// Ambil user id
-$student_id = isset($_SESSION['student']['id'])
-            ? intval($_SESSION['student']['id'])
-            : intval($_SESSION['user_id']);
-
-
-$student_id = isset($_SESSION['student']['id'])
-    ? intval($_SESSION['student']['id'])
-    : intval($_SESSION['user_id']);
-
 
 // Helper functions
 function httpRequest($url, $headers = [], $post = null) {
@@ -160,7 +142,8 @@ function createTripayPayment($amount, $order_id, $customer_name, $customer_email
 }
 
 // Get student data from database
-$stmt = $conn->prepare("SELECT * FROM students WHERE id = ?");
+// Mengambil semua field dari tabel students sesuai struktur yang ada
+$stmt = $conn->prepare("SELECT id, name, class, tingkat, spp_bulanan, tambahan, biayatambahan, password, phone_no, balance FROM students WHERE id = ?");
 $stmt->bind_param("i", $student_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -172,6 +155,20 @@ if (!$student) {
     header('Location: login_siswa.php?error=invalid');
     exit;
 }
+
+// Normalize student data - pastikan semua field memiliki nilai default jika NULL
+$student = [
+    'id' => intval($student['id'] ?? 0),
+    'name' => $student['name'] ?? '',
+    'class' => $student['class'] ?? '',
+    'tingkat' => $student['tingkat'] ?? '',
+    'spp_bulanan' => $student['spp_bulanan'] ?? null,
+    'tambahan' => $student['tambahan'] ?? '',
+    'biayatambahan' => $student['biayatambahan'] ?? null,
+    'password' => $student['password'] ?? '',
+    'phone_no' => $student['phone_no'] ?? null,
+    'balance' => $student['balance'] ?? null
+];
 
 // Get student bills (tagihan)
 $stmt = $conn->prepare("SELECT * FROM tagihan WHERE student_id = ? ORDER BY id ASC");
@@ -284,7 +281,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $order_id = 'ORD-' . $student_id . '-' . date('YmdHis') . '-' . rand(1000, 9999);
                 
                 // Create Tripay payment
-                $customer_email = !empty($student['phone_no']) ? $student['phone_no'] . '@example.com' : 'student' . $student_id . '@example.com';
+                $customer_email = (!empty($student['phone_no']) && $student['phone_no'] !== null) ? $student['phone_no'] . '@example.com' : 'student' . $student_id . '@example.com';
                 
                 $tripay_response = createTripayPayment(
                     $total,
@@ -1375,7 +1372,7 @@ input, textarea, select {
         <div class="header">
             <a href="?logout=1" class="logout">Logout</a>
             <h1>Portal Pembayaran</h1>
-            <p><?= htmlspecialchars($student['name']) ?> - <?= htmlspecialchars($student['class']) ?></p>
+            <p><?= htmlspecialchars($student['name'] ?? '') ?> - <?= htmlspecialchars($student['class'] ?? '') ?></p>
         </div>
 
         <?php if ($show_menu): ?>
