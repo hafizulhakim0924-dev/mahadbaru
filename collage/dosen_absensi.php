@@ -600,24 +600,26 @@ $stmt->close();
                 <h2>Import Tagihan Massal</h2>
                 <p style="margin-bottom: 20px; color: #666;">
                     <strong>Cara penggunaan:</strong><br>
-                    1. Copy semua data dari spreadsheet (termasuk ID, Nama, dan Tagihan)<br>
+                    1. Copy data tagihan dari spreadsheet (hanya kolom tagihan saja, tanpa ID dan Nama)<br>
                     2. Paste di textarea "Paste Data dari Spreadsheet" di bawah<br>
-                    3. Format: <strong>ID | Nama | Kelas | Nama Tagihan 1 | Jumlah 1 | Nama Tagihan 2 | Jumlah 2 | ...</strong><br>
-                    4. Klik "Auto Fill ke Tabel" untuk mengisi otomatis ke tabel<br>
-                    5. Atau paste langsung per baris di kolom "Paste Tagihan"<br>
-                    6. Klik "Import Tagihan" untuk menyimpan
+                    3. Format: <strong>Nama Tagihan 1 | Jumlah 1 | Nama Tagihan 2 | Jumlah 2 | ...</strong><br>
+                    4. Urutan baris harus sesuai dengan urutan siswa di tabel<br>
+                    5. Klik "Auto Fill ke Tabel" untuk mengisi otomatis berdasarkan urutan<br>
+                    6. Atau paste langsung per baris di kolom "Paste Tagihan"<br>
+                    7. Klik "Import Tagihan" untuk menyimpan
                 </p>
                 
                 <div style="background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #667eea;">
-                    <strong>Contoh Format dari Spreadsheet:</strong><br>
+                    <strong>Contoh Format dari Spreadsheet (Hanya Tagihan):</strong><br>
                     <code style="display: block; margin-top: 8px; padding: 8px; background: white; border-radius: 4px; font-size: 12px; font-family: monospace;">
-                        1	Ahmad Zaki	X IPA 1	SPP Januari	500000	SPP Februari	500000	Uang Gedung	2000000<br>
-                        2	Siti Nurhaliza	X IPA 1	SPP Januari	500000	SPP Maret	500000<br>
-                        3	Budi Santoso	XI IPS 1	SPP Januari	500000	SPP Februari	500000	SPP Maret	500000
+                        SPP Januari	500000	SPP Februari	500000	Uang Gedung	2000000<br>
+                        SPP Januari	500000	SPP Maret	500000<br>
+                        SPP Januari	500000	SPP Februari	500000	SPP Maret	500000
                     </code>
                     <small style="color: #666; display: block; margin-top: 8px;">
-                        * Format: ID | Nama | Kelas | Nama Tagihan | Jumlah | Nama Tagihan | Jumlah | ...<br>
-                        * Bisa paste 100+ baris sekaligus, sistem akan otomatis mengisi ke tabel yang sesuai
+                        * Format: Nama Tagihan | Jumlah | Nama Tagihan | Jumlah | ...<br>
+                        * <strong>PENTING:</strong> Urutan baris harus sesuai dengan urutan siswa di tabel (baris 1 = siswa pertama, baris 2 = siswa kedua, dst)<br>
+                        * Bisa paste 100+ baris sekaligus, sistem akan mengisi berdasarkan urutan baris
                     </small>
                 </div>
                 
@@ -630,7 +632,7 @@ $stmt->close();
                         id="bulk_paste_area" 
                         rows="8" 
                         style="width: 100%; font-family: 'Courier New', monospace; font-size: 13px; padding: 10px; border: 2px solid #ffc107; border-radius: 5px;"
-                        placeholder="Paste semua data dari spreadsheet di sini...&#10;&#10;Contoh:&#10;1	Ahmad Zaki	X IPA 1	SPP Januari	500000	SPP Februari	500000&#10;2	Siti Nurhaliza	X IPA 1	SPP Januari	500000"
+                        placeholder="Paste data tagihan dari spreadsheet di sini (hanya tagihan, tanpa ID dan Nama)...&#10;&#10;Contoh:&#10;SPP Januari	500000	SPP Februari	500000	Uang Gedung	2000000&#10;SPP Januari	500000	SPP Maret	500000&#10;SPP Januari	500000	SPP Februari	500000	SPP Maret	500000"
                     ></textarea>
                     <div style="margin-top: 10px;">
                         <button type="button" class="btn" onclick="autoFillFromBulk()" style="background: #ffc107; color: #000;">
@@ -729,64 +731,49 @@ $stmt->close();
             }
             
             const lines = bulkData.split('\n');
+            const textareas = document.querySelectorAll('textarea[name^="tagihan["]');
             let filledCount = 0;
-            let notFoundCount = 0;
-            const notFoundIds = [];
+            let skippedCount = 0;
             
             lines.forEach((line, lineNum) => {
                 const trimmedLine = line.trim();
-                if (!trimmedLine) return;
-                
-                // Deteksi separator: tab atau koma
-                let cols;
-                if (trimmedLine.indexOf('\t') !== -1) {
-                    cols = trimmedLine.split('\t');
-                } else {
-                    cols = trimmedLine.split(',');
+                if (!trimmedLine) {
+                    skippedCount++;
+                    return; // Skip baris kosong
                 }
                 
-                cols = cols.map(col => col.trim()).filter(col => col);
-                
-                if (cols.length < 3) {
-                    return; // Skip jika tidak lengkap
+                // Cek apakah masih ada textarea yang tersedia
+                if (lineNum >= textareas.length) {
+                    skippedCount++;
+                    return; // Skip jika baris lebih banyak dari jumlah siswa
                 }
                 
-                // Ambil ID (kolom pertama)
-                const studentId = parseInt(cols[0]);
-                if (isNaN(studentId) || studentId <= 0) {
-                    return; // Skip jika ID tidak valid
-                }
-                
-                // Cari textarea dengan ID yang sesuai
-                const textarea = document.getElementById('tagihan_' + studentId);
+                // Ambil textarea berdasarkan urutan baris
+                const textarea = textareas[lineNum];
                 if (textarea) {
-                    // Ambil data tagihan (mulai dari kolom 4, setelah ID, Nama, Kelas)
-                    // Format: ID | Nama | Kelas | Tagihan1 | Jumlah1 | Tagihan2 | Jumlah2 | ...
-                    const tagihanData = cols.slice(3); // Skip ID, Nama, Kelas
+                    // Deteksi separator: tab atau koma
+                    const separator = trimmedLine.indexOf('\t') !== -1 ? '\t' : ',';
                     
-                    if (tagihanData.length > 0) {
-                        // Gabungkan dengan tab atau koma sesuai separator asli
-                        const separator = trimmedLine.indexOf('\t') !== -1 ? '\t' : ',';
-                        textarea.value = tagihanData.join(separator);
-                        filledCount++;
-                        
-                        // Highlight row untuk feedback visual
-                        const row = textarea.closest('tr');
-                        row.style.backgroundColor = '#d4edda';
-                        setTimeout(() => {
-                            row.style.backgroundColor = '';
-                        }, 2000);
-                    }
-                } else {
-                    notFoundCount++;
-                    notFoundIds.push(studentId);
+                    // Langsung isi dengan data tagihan (tanpa perlu parse ID/Nama)
+                    textarea.value = trimmedLine;
+                    filledCount++;
+                    
+                    // Highlight row untuk feedback visual
+                    const row = textarea.closest('tr');
+                    row.style.backgroundColor = '#d4edda';
+                    setTimeout(() => {
+                        row.style.backgroundColor = '';
+                    }, 2000);
                 }
             });
             
             // Tampilkan hasil
             let message = `Berhasil mengisi ${filledCount} baris!`;
-            if (notFoundCount > 0) {
-                message += `\n\n${notFoundCount} ID tidak ditemukan: ${notFoundIds.slice(0, 10).join(', ')}${notFoundIds.length > 10 ? '...' : ''}`;
+            if (skippedCount > 0) {
+                message += `\n\n${skippedCount} baris dilewati (kosong atau melebihi jumlah siswa).`;
+            }
+            if (lines.length > textareas.length) {
+                message += `\n\nPeringatan: Data yang di-paste (${lines.length} baris) lebih banyak dari jumlah siswa (${textareas.length}). Baris kelebihan akan diabaikan.`;
             }
             alert(message);
         }
