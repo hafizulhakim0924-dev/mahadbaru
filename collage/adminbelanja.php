@@ -9,6 +9,12 @@
  * - Daftar Siswa & Tagihan
  */
 
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/adminbelanja_errors.log');
+
 session_start();
 
 // ============================================
@@ -34,14 +40,19 @@ if (!isset($_SESSION['admin_id'])) {
 // DATABASE CONNECTION
 // ============================================
 $conn = null;
+$db_error = '';
 try {
     $conn = new mysqli($config['db_host'], $config['db_user'], $config['db_pass'], $config['db_name']);
     if ($conn->connect_error) {
-        throw new Exception("Database connection failed: " . $conn->connect_error);
+        $db_error = "Database connection failed: " . $conn->connect_error;
+        error_log("AdminBelanja DB Error: " . $db_error);
+        throw new Exception($db_error);
     }
     $conn->set_charset($config['charset']);
 } catch (Exception $e) {
-    die('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Error</title></head><body style="font-family:sans-serif;text-align:center;padding:50px;"><h2>Database Error</h2><p>' . htmlspecialchars($e->getMessage()) . '</p><p>Silakan hubungi administrator.</p></body></html>');
+    $error_message = $e->getMessage();
+    error_log("AdminBelanja Exception: " . $error_message);
+    die('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Error</title></head><body style="font-family:sans-serif;text-align:center;padding:50px;"><h2>Database Error</h2><p>' . htmlspecialchars($error_message) . '</p><p>Silakan hubungi administrator.</p><p style="font-size:12px;color:#666;">Error logged to: adminbelanja_errors.log</p></body></html>');
 }
 
 // ============================================
@@ -80,9 +91,13 @@ function getBarangList($conn) {
                 $barang_list[] = $row;
             }
             $stmt->close();
+        } else {
+            $error_msg = "Error preparing barang query: " . $conn->error;
+            error_log("AdminBelanja: " . $error_msg);
         }
     } catch (Exception $e) {
-        // Return empty array on error
+        $error_msg = "Error getting barang list: " . $e->getMessage();
+        error_log("AdminBelanja: " . $error_msg);
     }
     return $barang_list;
 }
@@ -108,9 +123,13 @@ function getPendingVouchers($conn) {
                 $vouchers[] = $row;
             }
             $stmt->close();
+        } else {
+            $error_msg = "Error preparing vouchers query: " . $conn->error;
+            error_log("AdminBelanja: " . $error_msg);
         }
     } catch (Exception $e) {
-        // Return empty array on error
+        $error_msg = "Error getting vouchers: " . $e->getMessage();
+        error_log("AdminBelanja: " . $error_msg);
     }
     return $vouchers;
 }
@@ -141,9 +160,13 @@ function getStudentsWithTagihan($conn) {
                 $students[] = $row;
             }
             $stmt->close();
+        } else {
+            $error_msg = "Error preparing students query: " . $conn->error;
+            error_log("AdminBelanja: " . $error_msg);
         }
     } catch (Exception $e) {
-        // Return empty array on error
+        $error_msg = "Error getting students with tagihan: " . $e->getMessage();
+        error_log("AdminBelanja: " . $error_msg);
     }
     return $students;
 }
@@ -176,11 +199,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 if ($stmt->execute()) {
                     $success = "Barang berhasil ditambahkan!";
                 } else {
-                    $error = "Gagal menambahkan barang: " . $stmt->error;
+                    $error_msg = "Gagal menambahkan barang: " . $stmt->error;
+                    error_log("AdminBelanja - Tambah Barang Error: " . $error_msg);
+                    $error = $error_msg;
                 }
                 $stmt->close();
             } catch (Exception $e) {
-                $error = "Error: " . $e->getMessage();
+                $error_msg = "Error: " . $e->getMessage();
+                error_log("AdminBelanja - Tambah Barang Exception: " . $error_msg);
+                $error = $error_msg;
             }
         }
     }
@@ -210,11 +237,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 if ($stmt->execute()) {
                     $success = "Barang berhasil diupdate!";
                 } else {
-                    $error = "Gagal mengupdate barang: " . $stmt->error;
+                    $error_msg = "Gagal mengupdate barang: " . $stmt->error;
+                    error_log("AdminBelanja - Edit Barang Error: " . $error_msg);
+                    $error = $error_msg;
                 }
                 $stmt->close();
             } catch (Exception $e) {
-                $error = "Error: " . $e->getMessage();
+                $error_msg = "Error: " . $e->getMessage();
+                error_log("AdminBelanja - Edit Barang Exception: " . $error_msg);
+                $error = $error_msg;
             }
         }
     }
@@ -233,11 +264,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 if ($stmt->execute()) {
                     $success = "Barang berhasil dihapus!";
                 } else {
-                    $error = "Gagal menghapus barang: " . $stmt->error;
+                    $error_msg = "Gagal menghapus barang: " . $stmt->error;
+                    error_log("AdminBelanja - Hapus Barang Error: " . $error_msg);
+                    $error = $error_msg;
                 }
                 $stmt->close();
             } catch (Exception $e) {
-                $error = "Error: " . $e->getMessage();
+                $error_msg = "Error: " . $e->getMessage();
+                error_log("AdminBelanja - Hapus Barang Exception: " . $error_msg);
+                $error = $error_msg;
             }
         }
     }
@@ -264,14 +299,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     if ($stmt->execute()) {
                         $success = "Voucher berhasil diredeem!";
                     } else {
-                        $error = "Gagal redeem voucher: " . $stmt->error;
+                        $error_msg = "Gagal redeem voucher: " . $stmt->error;
+                        error_log("AdminBelanja - Redeem Voucher Error: " . $error_msg);
+                        $error = $error_msg;
                     }
                     $stmt->close();
                 } else {
-                    $error = "Voucher tidak ditemukan atau sudah diredeem!";
+                    $error_msg = "Voucher tidak ditemukan atau sudah diredeem!";
+                    error_log("AdminBelanja - Redeem Voucher: " . $error_msg);
+                    $error = $error_msg;
                 }
             } catch (Exception $e) {
-                $error = "Error: " . $e->getMessage();
+                $error_msg = "Error: " . $e->getMessage();
+                error_log("AdminBelanja - Redeem Voucher Exception: " . $error_msg);
+                $error = $error_msg;
             }
         }
     }
@@ -395,6 +436,15 @@ if (isset($_GET['logout'])) {
 $barang_list = getBarangList($conn);
 $pending_vouchers = getPendingVouchers($conn);
 $students_with_tagihan = getStudentsWithTagihan($conn);
+
+// Log any database errors
+if ($conn->errno) {
+    $db_error_msg = "Database error: " . $conn->error;
+    error_log("AdminBelanja: " . $db_error_msg);
+    if (empty($error)) {
+        $error = $db_error_msg;
+    }
+}
 
 ?>
 <!DOCTYPE html>
@@ -589,6 +639,50 @@ $students_with_tagihan = getStudentsWithTagihan($conn);
         <?php if ($error): ?>
             <div class="error"><?= sanitize($error) ?></div>
         <?php endif; ?>
+        
+        <!-- Debug Info Panel -->
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #667eea;">
+            <details>
+                <summary style="cursor: pointer; font-weight: 600; color: #667eea;">🔍 Debug Information (Klik untuk melihat)</summary>
+                <div style="margin-top: 15px; padding: 15px; background: white; border-radius: 5px; font-size: 12px; font-family: monospace;">
+                    <strong>Database Connection:</strong><br>
+                    <?php if ($conn): ?>
+                        <span style="color: green;">✓ Connected</span><br>
+                        <?php if ($conn->errno): ?>
+                            <span style="color: red;">✗ Error: <?= sanitize($conn->error) ?> (Code: <?= $conn->errno ?>)</span><br>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <span style="color: red;">✗ Not Connected</span><br>
+                    <?php endif; ?>
+                    
+                    <br><strong>Session Info:</strong><br>
+                    Admin ID: <?= isset($_SESSION['admin_id']) ? $_SESSION['admin_id'] : 'Not set' ?><br>
+                    Admin Nama: <?= isset($_SESSION['admin_nama']) ? sanitize($_SESSION['admin_nama']) : 'Not set' ?><br>
+                    
+                    <br><strong>Data Count:</strong><br>
+                    Barang: <?= count($barang_list) ?><br>
+                    Vouchers Pending: <?= count($pending_vouchers) ?><br>
+                    Students with Tagihan: <?= count($students_with_tagihan) ?><br>
+                    
+                    <br><strong>PHP Errors:</strong><br>
+                    <?php 
+                    $php_errors = error_get_last();
+                    if ($php_errors): ?>
+                        <span style="color: red;">
+                            Type: <?= $php_errors['type'] ?><br>
+                            Message: <?= sanitize($php_errors['message']) ?><br>
+                            File: <?= sanitize($php_errors['file']) ?><br>
+                            Line: <?= $php_errors['line'] ?>
+                        </span>
+                    <?php else: ?>
+                        <span style="color: green;">✓ No PHP errors</span>
+                    <?php endif; ?>
+                    
+                    <br><br><strong>Error Log File:</strong><br>
+                    <code><?= __DIR__ ?>/adminbelanja_errors.log</code>
+                </div>
+            </details>
+        </div>
 
         <div class="tabs">
             <button class="tab-btn active" onclick="showTab('barang')">Kelola Barang</button>
