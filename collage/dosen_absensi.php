@@ -439,6 +439,11 @@ $stmt->close();
         .tab-btn.active { background: #667eea; color: white; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+        @media (max-width: 768px) {
+            div[style*="grid-template-columns: 1fr 1fr"] {
+                grid-template-columns: 1fr !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -604,37 +609,76 @@ $stmt->close();
                 <h2>Import Tagihan Massal</h2>
                 <p style="margin-bottom: 20px; color: #666;">
                     <strong>Cara penggunaan:</strong><br>
-                    1. Copy data dari spreadsheet (Excel/Google Sheets)<br>
-                    2. Paste di textarea di bawah ini<br>
-                    3. Format: <strong>Student ID | Nama Tagihan 1 | Jumlah 1 | Nama Tagihan 2 | Jumlah 2 | ...</strong><br>
+                    1. Lihat daftar siswa di kolom kiri (ID dan Nama)<br>
+                    2. Copy data tagihan dari spreadsheet (Excel/Google Sheets)<br>
+                    3. Paste di textarea kanan dengan format: <strong>ID | Nama Tagihan 1 | Jumlah 1 | Nama Tagihan 2 | Jumlah 2 | ...</strong><br>
                     4. Dipisah dengan <strong>Tab</strong> atau <strong>Koma (,)</strong><br>
                     5. Satu baris = satu student dengan multiple tagihan
                 </p>
                 
                 <div style="background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #667eea;">
-                    <strong>Contoh Format (1 student, 5 tagihan):</strong><br>
+                    <strong>Contoh Format:</strong><br>
                     <code style="display: block; margin-top: 8px; padding: 8px; background: white; border-radius: 4px; font-size: 12px;">
-                        1	SPP Januari	500000	SPP Februari	500000	SPP Maret	500000	Uang Gedung	2000000	Uang Seragam	500000<br>
-                        2	SPP Januari	500000	SPP Februari	500000	Uang Gedung	2000000
+                        1	SPP Januari	500000	SPP Februari	500000	SPP Maret	500000<br>
+                        2	SPP Januari	500000	Uang Gedung	2000000
                     </code>
                     <small style="color: #666; display: block; margin-top: 8px;">
-                        * Format: Student ID, kemudian pasangan Nama Tagihan dan Jumlah (bisa multiple)<br>
-                        * Contoh: ID 1 (Ahmad) langsung ditambahkan 5 tagihan sekaligus
+                        * Format: Student ID (lihat di kolom kiri), kemudian pasangan Nama Tagihan dan Jumlah<br>
+                        * Gunakan ID yang sesuai dengan daftar siswa di kolom kiri
                     </small>
                 </div>
                 
                 <form method="POST">
                     <input type="hidden" name="action" value="import_tagihan">
                     
-                    <div class="form-group">
-                        <label>Paste Data Tagihan dari Spreadsheet</label>
-                        <textarea 
-                            name="data_paste" 
-                            rows="15" 
-                            style="font-family: 'Courier New', monospace; font-size: 13px;"
-                            placeholder="Paste data dari spreadsheet di sini...&#10;&#10;Contoh:&#10;1	SPP Januari	500000	SPP Februari	500000	SPP Maret	500000"
-                            required
-                        ></textarea>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <!-- Kolom Kiri: Daftar Siswa -->
+                        <div>
+                            <label style="display: block; margin-bottom: 10px; font-weight: 600; color: #2d3748;">Daftar Siswa (ID & Nama)</label>
+                            <div style="background: #f8f9fa; border: 1px solid #cbd5e0; border-radius: 5px; padding: 10px; max-height: 500px; overflow-y: auto;">
+                                <table style="width: 100%; font-size: 13px;">
+                                    <thead>
+                                        <tr style="background: #667eea; color: white;">
+                                            <th style="padding: 8px; text-align: left;">ID</th>
+                                            <th style="padding: 8px; text-align: left;">Nama</th>
+                                            <th style="padding: 8px; text-align: left;">Kelas</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (empty($students)): ?>
+                                            <tr>
+                                                <td colspan="3" style="padding: 15px; text-align: center; color: #666;">
+                                                    Tidak ada data siswa
+                                                </td>
+                                            </tr>
+                                        <?php else: ?>
+                                            <?php foreach ($students as $student): ?>
+                                                <tr style="border-bottom: 1px solid #e2e8f0;">
+                                                    <td style="padding: 8px; font-weight: 600; color: #667eea;"><?= htmlspecialchars($student['id']) ?></td>
+                                                    <td style="padding: 8px;"><?= htmlspecialchars($student['name']) ?></td>
+                                                    <td style="padding: 8px; color: #666;"><?= htmlspecialchars($student['class'] ?? '-') ?></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Kolom Kanan: Paste Tagihan -->
+                        <div>
+                            <label style="display: block; margin-bottom: 10px; font-weight: 600; color: #2d3748;">Paste Data Tagihan</label>
+                            <textarea 
+                                name="data_paste" 
+                                rows="20" 
+                                style="width: 100%; font-family: 'Courier New', monospace; font-size: 13px; padding: 10px; border: 1px solid #cbd5e0; border-radius: 5px;"
+                                placeholder="Paste data tagihan di sini...&#10;&#10;Contoh:&#10;1	SPP Januari	500000	SPP Februari	500000&#10;2	SPP Januari	500000	Uang Gedung	2000000"
+                                required
+                            ></textarea>
+                            <small style="color: #666; display: block; margin-top: 5px;">
+                                Gunakan ID yang sesuai dengan daftar siswa di kolom kiri
+                            </small>
+                        </div>
                     </div>
 
                     <button type="submit" class="btn">Import Tagihan</button>
