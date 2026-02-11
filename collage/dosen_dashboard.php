@@ -2,6 +2,12 @@
 session_start();
 date_default_timezone_set('Asia/Jakarta');
 
+// Check if dosen is logged in - redirect to unified login if not
+if (!isset($_SESSION['dosen_id'])) {
+    header('Location: login_siswa.php');
+    exit;
+}
+
 // Database Config
 $servername = "localhost";
 $username = "ypikhair_admin";
@@ -681,13 +687,38 @@ try {
             font-weight: 600;
             color: #065f46;
         }
+        .logout-btn {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 16px;
+            text-decoration: none;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        .header {
+            position: relative;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
+            <a href="?logout=1" class="logout-btn">Logout</a>
             <h1>📋 Dashboard Dosen</h1>
             <p>Input Absensi Mahad Ibnu Zubair</p>
+            <?php if (isset($_SESSION['dosen_nama'])): ?>
+                <p style="margin-top: 8px; font-size: 13px; opacity: 0.9;">Dosen: <?= htmlspecialchars($_SESSION['dosen_nama']) ?></p>
+            <?php endif; ?>
         </div>
 
         <?php if ($message): ?>
@@ -1037,5 +1068,13 @@ try {
     </script>
 </body>
 </html>
-<?php $conn->close(); ?>
+<?php
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header('Location: login_siswa.php');
+    exit;
+}
+
+$conn->close();
+?>
 
