@@ -1,111 +1,288 @@
 <?php
+/**
+ * Admin Belanja - Kelola Barang, Voucher, dan Tagihan
+ * 
+ * Fitur:
+ * - Kelola Barang (CRUD)
+ * - Import Barang Massal
+ * - Redeem Voucher Pembayaran
+ * - Daftar Siswa & Tagihan
+ */
+
 session_start();
 
-// Database Config
-$servername = "localhost";
-$username = "ypikhair_admin";
-$password = "hakim123123123";
-$dbname = "ypikhair_datautama";
+// ============================================
+// CONFIGURATION
+// ============================================
+$config = [
+    'db_host' => 'localhost',
+    'db_user' => 'ypikhair_admin',
+    'db_pass' => 'hakim123123123',
+    'db_name' => 'ypikhair_datautama',
+    'charset' => 'utf8mb4'
+];
 
-// Check if admin is logged in - redirect to unified login if not
+// ============================================
+// SECURITY CHECK
+// ============================================
 if (!isset($_SESSION['admin_id'])) {
     header('Location: login_siswa.php');
     exit;
 }
 
-// Admin is logged in
-$conn = new mysqli($servername, $username, $password, $dbname);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+// ============================================
+// DATABASE CONNECTION
+// ============================================
+$conn = null;
+try {
+    $conn = new mysqli($config['db_host'], $config['db_user'], $config['db_pass'], $config['db_name']);
+    if ($conn->connect_error) {
+        throw new Exception("Database connection failed: " . $conn->connect_error);
+    }
+    $conn->set_charset($config['charset']);
+} catch (Exception $e) {
+    die('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Error</title></head><body style="font-family:sans-serif;text-align:center;padding:50px;"><h2>Database Error</h2><p>' . htmlspecialchars($e->getMessage()) . '</p><p>Silakan hubungi administrator.</p></body></html>');
 }
-$conn->set_charset("utf8mb4");
 
-// Initialize variables
+// ============================================
+// INITIALIZE VARIABLES
+// ============================================
+$admin_id = $_SESSION['admin_id'];
+$admin_nama = $_SESSION['admin_nama'] ?? 'Admin';
 $success = '';
 $error = '';
+$barang_list = [];
+$pending_vouchers = [];
+$students_with_tagihan = [];
 
-$admin_id = $_SESSION['admin_id'];
-$admin_nama = $_SESSION['admin_nama'];
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
 
-// Handle form submissions
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
-    if ($_POST['action'] == 'tambah_barang') {
-        $nama_barang = trim($_POST['nama_barang']);
-        $deskripsi = trim($_POST['deskripsi'] ?? '');
-        $harga = floatval($_POST['harga']);
-        $stok = intval($_POST['stok']);
-        $status = $_POST['status'];
-        
-        $stmt = $conn->prepare("INSERT INTO barang (nama_barang, deskripsi, harga, stok, status) VALUES (?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssdis", $nama_barang, $deskripsi, $harga, $stok, $status);
-        
-        if ($stmt->execute()) {
-            $success = "Barang berhasil ditambahkan!";
-        } else {
-            $error = "Gagal menambahkan barang: " . $stmt->error;
-        }
-        $stmt->close();
-    } elseif ($_POST['action'] == 'edit_barang') {
-        $id = intval($_POST['id']);
-        $nama_barang = trim($_POST['nama_barang']);
-        $deskripsi = trim($_POST['deskripsi'] ?? '');
-        $harga = floatval($_POST['harga']);
-        $stok = intval($_POST['stok']);
-        $status = $_POST['status'];
-        
-        $stmt = $conn->prepare("UPDATE barang SET nama_barang = ?, deskripsi = ?, harga = ?, stok = ?, status = ? WHERE id = ?");
-        $stmt->bind_param("ssdisi", $nama_barang, $deskripsi, $harga, $stok, $status, $id);
-        
-        if ($stmt->execute()) {
-            $success = "Barang berhasil diupdate!";
-        } else {
-            $error = "Gagal mengupdate barang: " . $stmt->error;
-        }
-        $stmt->close();
-    } elseif ($_POST['action'] == 'hapus_barang') {
-        $id = intval($_POST['id']);
-        
-        $stmt = $conn->prepare("DELETE FROM barang WHERE id = ?");
-        $stmt->bind_param("i", $id);
-        
-        if ($stmt->execute()) {
-            $success = "Barang berhasil dihapus!";
-        } else {
-            $error = "Gagal menghapus barang: " . $stmt->error;
-        }
-        $stmt->close();
-    } elseif ($_POST['action'] == 'redeem_voucher') {
-        $voucher_code = trim($_POST['voucher_code']);
-        
-        $stmt = $conn->prepare("SELECT * FROM voucher_pembayaran WHERE voucher_code = ? AND status = 'pending'");
-        $stmt->bind_param("s", $voucher_code);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $voucher = $result->fetch_assoc();
-        $stmt->close();
-        
-        if ($voucher) {
-            // Update voucher status
-            $stmt = $conn->prepare("UPDATE voucher_pembayaran SET status = 'redeemed', redeemed_at = NOW(), redeemed_by = ? WHERE id = ?");
-            $stmt->bind_param("ii", $admin_id, $voucher['id']);
-            
-            if ($stmt->execute()) {
-                $success = "Voucher berhasil diredeem!";
-            } else {
-                $error = "Gagal redeem voucher: " . $stmt->error;
+/**
+ * Sanitize input
+ */
+function sanitize($data) {
+    return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * Get all barang
+ */
+function getBarangList($conn) {
+    $barang_list = [];
+    try {
+        $stmt = $conn->prepare("SELECT * FROM barang ORDER BY nama_barang ASC");
+        if ($stmt) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $barang_list[] = $row;
             }
             $stmt->close();
-        } else {
-            $error = "Voucher tidak ditemukan atau sudah diredeem!";
         }
-    } elseif ($_POST['action'] == 'import_barang') {
-        // Import bulk dari spreadsheet
+    } catch (Exception $e) {
+        // Return empty array on error
+    }
+    return $barang_list;
+}
+
+/**
+ * Get pending vouchers
+ */
+function getPendingVouchers($conn) {
+    $vouchers = [];
+    try {
+        $stmt = $conn->prepare("
+            SELECT v.*, s.name as student_name, s.class, p.total_harga 
+            FROM voucher_pembayaran v
+            LEFT JOIN students s ON v.student_id = s.id
+            LEFT JOIN pesanan_belanja p ON v.pesanan_id = p.id
+            WHERE v.status = 'pending'
+            ORDER BY v.created_at DESC
+        ");
+        if ($stmt) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $vouchers[] = $row;
+            }
+            $stmt->close();
+        }
+    } catch (Exception $e) {
+        // Return empty array on error
+    }
+    return $vouchers;
+}
+
+/**
+ * Get students with tagihan
+ */
+function getStudentsWithTagihan($conn) {
+    $students = [];
+    try {
+        $stmt = $conn->prepare("
+            SELECT 
+                s.id,
+                s.name,
+                s.class,
+                COUNT(t.id) as jumlah_tagihan,
+                GROUP_CONCAT(CONCAT(t.nama_tagihan, ' (Rp ', FORMAT(t.jumlah, 0), ')') SEPARATOR ', ') as list_tagihan,
+                COALESCE(SUM(t.jumlah), 0) as total_tagihan
+            FROM students s
+            LEFT JOIN tagihan t ON s.id = t.student_id
+            GROUP BY s.id, s.name, s.class
+            ORDER BY s.name ASC
+        ");
+        if ($stmt) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $students[] = $row;
+            }
+            $stmt->close();
+        }
+    } catch (Exception $e) {
+        // Return empty array on error
+    }
+    return $students;
+}
+
+// ============================================
+// HANDLE FORM SUBMISSIONS
+// ============================================
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
+    $action = $_POST['action'];
+    
+    // Handle tambah barang
+    if ($action == 'tambah_barang') {
+        $nama_barang = trim($_POST['nama_barang'] ?? '');
+        $deskripsi = trim($_POST['deskripsi'] ?? '');
+        $harga = floatval($_POST['harga'] ?? 0);
+        $stok = intval($_POST['stok'] ?? 0);
+        $status = in_array($_POST['status'] ?? '', ['aktif', 'nonaktif']) ? $_POST['status'] : 'aktif';
+        
+        if (empty($nama_barang)) {
+            $error = "Nama barang tidak boleh kosong!";
+        } elseif ($harga <= 0) {
+            $error = "Harga harus lebih dari 0!";
+        } elseif ($stok < 0) {
+            $error = "Stok tidak boleh negatif!";
+        } else {
+            try {
+                $stmt = $conn->prepare("INSERT INTO barang (nama_barang, deskripsi, harga, stok, status) VALUES (?, ?, ?, ?, ?)");
+                $stmt->bind_param("ssdis", $nama_barang, $deskripsi, $harga, $stok, $status);
+                
+                if ($stmt->execute()) {
+                    $success = "Barang berhasil ditambahkan!";
+                } else {
+                    $error = "Gagal menambahkan barang: " . $stmt->error;
+                }
+                $stmt->close();
+            } catch (Exception $e) {
+                $error = "Error: " . $e->getMessage();
+            }
+        }
+    }
+    
+    // Handle edit barang
+    elseif ($action == 'edit_barang') {
+        $id = intval($_POST['id'] ?? 0);
+        $nama_barang = trim($_POST['nama_barang'] ?? '');
+        $deskripsi = trim($_POST['deskripsi'] ?? '');
+        $harga = floatval($_POST['harga'] ?? 0);
+        $stok = intval($_POST['stok'] ?? 0);
+        $status = in_array($_POST['status'] ?? '', ['aktif', 'nonaktif']) ? $_POST['status'] : 'aktif';
+        
+        if ($id <= 0) {
+            $error = "ID barang tidak valid!";
+        } elseif (empty($nama_barang)) {
+            $error = "Nama barang tidak boleh kosong!";
+        } elseif ($harga <= 0) {
+            $error = "Harga harus lebih dari 0!";
+        } elseif ($stok < 0) {
+            $error = "Stok tidak boleh negatif!";
+        } else {
+            try {
+                $stmt = $conn->prepare("UPDATE barang SET nama_barang = ?, deskripsi = ?, harga = ?, stok = ?, status = ? WHERE id = ?");
+                $stmt->bind_param("ssdisi", $nama_barang, $deskripsi, $harga, $stok, $status, $id);
+                
+                if ($stmt->execute()) {
+                    $success = "Barang berhasil diupdate!";
+                } else {
+                    $error = "Gagal mengupdate barang: " . $stmt->error;
+                }
+                $stmt->close();
+            } catch (Exception $e) {
+                $error = "Error: " . $e->getMessage();
+            }
+        }
+    }
+    
+    // Handle hapus barang
+    elseif ($action == 'hapus_barang') {
+        $id = intval($_POST['id'] ?? 0);
+        
+        if ($id <= 0) {
+            $error = "ID barang tidak valid!";
+        } else {
+            try {
+                $stmt = $conn->prepare("DELETE FROM barang WHERE id = ?");
+                $stmt->bind_param("i", $id);
+                
+                if ($stmt->execute()) {
+                    $success = "Barang berhasil dihapus!";
+                } else {
+                    $error = "Gagal menghapus barang: " . $stmt->error;
+                }
+                $stmt->close();
+            } catch (Exception $e) {
+                $error = "Error: " . $e->getMessage();
+            }
+        }
+    }
+    
+    // Handle redeem voucher
+    elseif ($action == 'redeem_voucher') {
+        $voucher_code = trim($_POST['voucher_code'] ?? '');
+        
+        if (empty($voucher_code)) {
+            $error = "Kode voucher tidak boleh kosong!";
+        } else {
+            try {
+                $stmt = $conn->prepare("SELECT * FROM voucher_pembayaran WHERE voucher_code = ? AND status = 'pending'");
+                $stmt->bind_param("s", $voucher_code);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $voucher = $result->fetch_assoc();
+                $stmt->close();
+                
+                if ($voucher) {
+                    $stmt = $conn->prepare("UPDATE voucher_pembayaran SET status = 'redeemed', redeemed_at = NOW(), redeemed_by = ? WHERE id = ?");
+                    $stmt->bind_param("ii", $admin_id, $voucher['id']);
+                    
+                    if ($stmt->execute()) {
+                        $success = "Voucher berhasil diredeem!";
+                    } else {
+                        $error = "Gagal redeem voucher: " . $stmt->error;
+                    }
+                    $stmt->close();
+                } else {
+                    $error = "Voucher tidak ditemukan atau sudah diredeem!";
+                }
+            } catch (Exception $e) {
+                $error = "Error: " . $e->getMessage();
+            }
+        }
+    }
+    
+    // Handle import barang
+    elseif ($action == 'import_barang') {
         $data_paste = trim($_POST['data_paste'] ?? '');
         
         if (empty($data_paste)) {
             $error = "Data tidak boleh kosong!";
         } else {
-            // Parse data yang di-paste
             $lines = explode("\n", $data_paste);
             $barang_data = [];
             $errors = [];
@@ -113,53 +290,43 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             
             foreach ($lines as $line_num => $line) {
                 $line = trim($line);
-                if (empty($line)) continue; // Skip baris kosong
+                if (empty($line)) continue;
                 
-                // Deteksi separator: tab atau koma
+                // Deteksi separator
                 if (strpos($line, "\t") !== false) {
                     $cols = explode("\t", $line);
                 } else {
                     $cols = explode(",", $line);
                 }
                 
-                // Bersihkan setiap kolom
                 $cols = array_map('trim', $cols);
                 
-                // Skip header jika ada
+                // Skip header
                 if ($line_num == 0 && (strtolower($cols[0]) == 'nama_barang' || strtolower($cols[0]) == 'nama' || strtolower($cols[0]) == 'barang')) {
                     continue;
                 }
                 
-                // Validasi jumlah kolom (minimal 3: nama, harga, stok)
                 if (count($cols) < 3) {
-                    $errors[] = "Baris " . ($line_num + 1) . ": Data tidak lengkap (minimal: Nama, Harga, Stok)";
+                    $errors[] = "Baris " . ($line_num + 1) . ": Data tidak lengkap";
                     continue;
                 }
                 
-                // Parse data
                 $nama_barang = $cols[0] ?? '';
                 $deskripsi = $cols[1] ?? '';
                 $harga = isset($cols[2]) ? floatval(str_replace(['Rp', 'rp', '.', ','], '', $cols[2])) : 0;
                 $stok = isset($cols[3]) ? intval($cols[3]) : 0;
                 $status = isset($cols[4]) ? (strtolower(trim($cols[4])) == 'nonaktif' ? 'nonaktif' : 'aktif') : 'aktif';
                 
-                // Validasi
                 if (empty($nama_barang)) {
-                    $errors[] = "Baris " . ($line_num + 1) . ": Nama barang tidak boleh kosong";
+                    $errors[] = "Baris " . ($line_num + 1) . ": Nama barang kosong";
                     continue;
                 }
                 
                 if ($harga <= 0) {
-                    $errors[] = "Baris " . ($line_num + 1) . ": Harga harus lebih dari 0";
+                    $errors[] = "Baris " . ($line_num + 1) . ": Harga tidak valid";
                     continue;
                 }
                 
-                if ($stok < 0) {
-                    $errors[] = "Baris " . ($line_num + 1) . ": Stok tidak boleh negatif";
-                    continue;
-                }
-                
-                // Simpan untuk insert
                 $barang_data[] = [
                     'nama_barang' => $nama_barang,
                     'deskripsi' => $deskripsi,
@@ -169,10 +336,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 ];
             }
             
-            // Insert ke database
             if (!empty($barang_data)) {
                 $conn->begin_transaction();
-                
                 try {
                     $stmt = $conn->prepare("INSERT INTO barang (nama_barang, deskripsi, harga, stok, status) VALUES (?, ?, ?, ?, ?)");
                     
@@ -188,7 +353,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                         if ($stmt->execute()) {
                             $success_count++;
                         } else {
-                            $errors[] = "Gagal insert: " . $data['nama_barang'] . " - " . $stmt->error;
+                            $errors[] = "Gagal insert: " . $data['nama_barang'];
                         }
                     }
                     
@@ -198,101 +363,39 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                         $conn->commit();
                         $success = "Berhasil mengimport $success_count barang!";
                         if (!empty($errors)) {
-                            $error = "Beberapa data gagal diimport:<br>" . implode("<br>", array_map('htmlspecialchars', $errors));
+                            $error = "Beberapa data gagal: " . implode(", ", array_slice($errors, 0, 5));
                         }
                     } else {
                         $conn->rollback();
-                        $error = "Tidak ada data yang berhasil diimport.<br>" . implode("<br>", array_map('htmlspecialchars', $errors));
+                        $error = "Tidak ada data yang berhasil diimport.";
                     }
                 } catch (Exception $e) {
                     $conn->rollback();
                     $error = "Error: " . $e->getMessage();
                 }
             } else {
-                $error = "Tidak ada data valid untuk diimport.<br>" . implode("<br>", array_map('htmlspecialchars', $errors));
+                $error = "Tidak ada data valid untuk diimport.";
             }
         }
     }
 }
 
-// Get all barang
-$barang_list = [];
-try {
-    $stmt = $conn->prepare("SELECT * FROM barang ORDER BY nama_barang ASC");
-    if ($stmt) {
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $barang_list[] = $row;
-        }
-        $stmt->close();
-    } else {
-        $error = "Error preparing query: " . $conn->error;
-    }
-} catch (Exception $e) {
-    $error = "Error fetching barang: " . $e->getMessage();
+// ============================================
+// HANDLE LOGOUT
+// ============================================
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header('Location: login_siswa.php');
+    exit;
 }
 
-// Get pending vouchers
-$pending_vouchers = [];
-try {
-    $stmt = $conn->prepare("
-        SELECT v.*, s.name as student_name, s.class, p.total_harga 
-        FROM voucher_pembayaran v
-        LEFT JOIN students s ON v.student_id = s.id
-        LEFT JOIN pesanan_belanja p ON v.pesanan_id = p.id
-        WHERE v.status = 'pending'
-        ORDER BY v.created_at DESC
-    ");
-    if ($stmt) {
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $pending_vouchers[] = $row;
-        }
-        $stmt->close();
-    } else {
-        // Table might not exist, set empty array
-        $pending_vouchers = [];
-    }
-} catch (Exception $e) {
-    // Table might not exist, set empty array
-    $pending_vouchers = [];
-}
+// ============================================
+// FETCH DATA
+// ============================================
+$barang_list = getBarangList($conn);
+$pending_vouchers = getPendingVouchers($conn);
+$students_with_tagihan = getStudentsWithTagihan($conn);
 
-// Get students with their tagihan grouped
-$students_with_tagihan = [];
-try {
-    $stmt = $conn->prepare("
-        SELECT 
-            s.id,
-            s.name,
-            s.class,
-            COUNT(t.id) as jumlah_tagihan,
-            GROUP_CONCAT(CONCAT(t.nama_tagihan, ' (Rp ', FORMAT(t.jumlah, 0), ')') SEPARATOR ', ') as list_tagihan,
-            SUM(t.jumlah) as total_tagihan
-        FROM students s
-        LEFT JOIN tagihan t ON s.id = t.student_id
-        GROUP BY s.id, s.name, s.class
-        ORDER BY s.name ASC
-    ");
-    if ($stmt) {
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $students_with_tagihan[] = $row;
-        }
-        $stmt->close();
-    } else {
-        // Table might not exist, set empty array
-        $students_with_tagihan = [];
-    }
-} catch (Exception $e) {
-    // Table might not exist, set empty array
-    $students_with_tagihan = [];
-}
-
-// Don't close connection here, close it at the end of file
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -302,52 +405,189 @@ try {
     <title>Admin - Kelola Belanja</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #f8f9fa; 
+            color: #333;
+        }
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 20px; 
+            position: relative;
+        }
         .header h1 { margin-bottom: 5px; }
         .header p { opacity: 0.9; }
-        .logout { float: right; background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; text-decoration: none; border-radius: 20px; font-size: 14px; }
-        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-        .card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .card h2 { color: #2d3748; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #667eea; }
+        .logout { 
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2); 
+            color: white; 
+            padding: 8px 16px; 
+            text-decoration: none; 
+            border-radius: 20px; 
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .logout:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .container { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        .card { 
+            background: white; 
+            padding: 25px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            margin-bottom: 20px; 
+        }
+        .card h2 { 
+            color: #2d3748; 
+            margin-bottom: 20px; 
+            padding-bottom: 10px; 
+            border-bottom: 2px solid #667eea; 
+        }
         .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 8px; color: #2d3748; font-weight: 600; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 5px; font-size: 14px; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #667eea; }
-        .btn { padding: 10px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; margin: 5px; }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 8px; 
+            color: #2d3748; 
+            font-weight: 600; 
+        }
+        .form-group input, 
+        .form-group select, 
+        .form-group textarea { 
+            width: 100%; 
+            padding: 10px; 
+            border: 1px solid #cbd5e0; 
+            border-radius: 5px; 
+            font-size: 14px; 
+            font-family: inherit;
+        }
+        .form-group input:focus, 
+        .form-group select:focus, 
+        .form-group textarea:focus { 
+            outline: none; 
+            border-color: #667eea; 
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .btn { 
+            padding: 10px 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-weight: 600; 
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        .btn:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); 
+        }
         .btn-danger { background: #e53e3e; }
         .btn-success { background: #48bb78; }
-        .success { background: #d4edda; color: #155724; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
-        .error { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; }
-        table th { background: #667eea; color: white; padding: 12px; text-align: left; font-weight: 600; }
-        table td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
-        table tr:hover { background: #f7fafc; }
-        .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .success { 
+            background: #d4edda; 
+            color: #155724; 
+            padding: 12px; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            border: 1px solid #c3e6cb;
+        }
+        .error { 
+            background: #f8d7da; 
+            color: #721c24; 
+            padding: 12px; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            border: 1px solid #f5c6cb;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+        }
+        table th { 
+            background: #667eea; 
+            color: white; 
+            padding: 12px; 
+            text-align: left; 
+            font-weight: 600; 
+        }
+        table td { 
+            padding: 12px; 
+            border-bottom: 1px solid #e2e8f0; 
+        }
+        table tr:hover { 
+            background: #f7fafc; 
+        }
+        .badge { 
+            padding: 4px 12px; 
+            border-radius: 20px; 
+            font-size: 12px; 
+            font-weight: 600; 
+            display: inline-block;
+        }
         .badge-success { background: #c6f6d5; color: #22543d; }
         .badge-warning { background: #feebc8; color: #7c2d12; }
         .badge-danger { background: #fed7d7; color: #742a2a; }
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-        .tab-btn { padding: 10px 20px; background: #e2e8f0; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; }
-        .tab-btn.active { background: #667eea; color: white; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
+        .tabs { 
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 20px; 
+            flex-wrap: wrap;
+        }
+        .tab-btn { 
+            padding: 10px 20px; 
+            background: #e2e8f0; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .tab-btn:hover {
+            background: #cbd5e0;
+        }
+        .tab-btn.active { 
+            background: #667eea; 
+            color: white; 
+        }
+        .tab-content { 
+            display: none; 
+        }
+        .tab-content.active { 
+            display: block; 
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <a href="?logout=1" class="logout">Logout</a>
         <h1>Admin - Kelola Belanja</h1>
-        <p>Admin: <?= htmlspecialchars($admin_nama) ?></p>
+        <p>Admin: <?= sanitize($admin_nama) ?></p>
     </div>
 
     <div class="container">
-        <?php if (isset($success)): ?>
-            <div class="success"><?= htmlspecialchars($success) ?></div>
+        <?php if ($success): ?>
+            <div class="success"><?= sanitize($success) ?></div>
         <?php endif; ?>
-        <?php if (isset($error)): ?>
-            <div class="error"><?= $error ?></div>
+        <?php if ($error): ?>
+            <div class="error"><?= sanitize($error) ?></div>
         <?php endif; ?>
 
         <div class="tabs">
@@ -365,7 +605,7 @@ try {
                     <input type="hidden" name="action" value="tambah_barang">
                     
                     <div class="form-group">
-                        <label>Nama Barang</label>
+                        <label>Nama Barang *</label>
                         <input type="text" name="nama_barang" required>
                     </div>
 
@@ -375,17 +615,17 @@ try {
                     </div>
 
                     <div class="form-group">
-                        <label>Harga</label>
+                        <label>Harga *</label>
                         <input type="number" name="harga" step="0.01" min="0" required>
                     </div>
 
                     <div class="form-group">
-                        <label>Stok</label>
+                        <label>Stok *</label>
                         <input type="number" name="stok" min="0" required>
                     </div>
 
                     <div class="form-group">
-                        <label>Status</label>
+                        <label>Status *</label>
                         <select name="status" required>
                             <option value="aktif">Aktif</option>
                             <option value="nonaktif">Nonaktif</option>
@@ -399,9 +639,9 @@ try {
             <div class="card">
                 <h2>Daftar Barang</h2>
                 <?php if (empty($barang_list)): ?>
-                    <p style="text-align: center; color: #666; padding: 40px;">
-                        Belum ada barang yang terdaftar.
-                    </p>
+                    <div class="empty-state">
+                        <p>Belum ada barang yang terdaftar.</p>
+                    </div>
                 <?php else: ?>
                     <table>
                         <thead>
@@ -417,8 +657,8 @@ try {
                         <tbody>
                             <?php foreach ($barang_list as $barang): ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($barang['nama_barang']) ?></td>
-                                    <td><?= htmlspecialchars($barang['deskripsi'] ?? '-') ?></td>
+                                    <td><?= sanitize($barang['nama_barang']) ?></td>
+                                    <td><?= sanitize($barang['deskripsi'] ?? '-') ?></td>
                                     <td>Rp <?= number_format($barang['harga'], 0, ',', '.') ?></td>
                                     <td><?= $barang['stok'] ?></td>
                                     <td>
@@ -427,7 +667,7 @@ try {
                                         </span>
                                     </td>
                                     <td>
-                                        <button class="btn btn-small" onclick="editBarang(<?= htmlspecialchars(json_encode($barang)) ?>)">Edit</button>
+                                        <button class="btn btn-small" onclick="editBarang(<?= htmlspecialchars(json_encode($barang), ENT_QUOTES, 'UTF-8') ?>)">Edit</button>
                                         <form method="POST" style="display: inline;" onsubmit="return confirm('Yakin hapus barang ini?')">
                                             <input type="hidden" name="action" value="hapus_barang">
                                             <input type="hidden" name="id" value="<?= $barang['id'] ?>">
@@ -451,21 +691,15 @@ try {
                     1. Copy data dari spreadsheet (Excel/Google Sheets)<br>
                     2. Paste di textarea di bawah ini<br>
                     3. Format: <strong>Nama Barang | Deskripsi | Harga | Stok | Status</strong><br>
-                    4. Dipisah dengan <strong>Tab</strong> atau <strong>Koma (,)</strong><br>
-                    5. Klik "Import Barang" untuk menyimpan ke database
+                    4. Dipisah dengan <strong>Tab</strong> atau <strong>Koma (,)</strong>
                 </p>
                 
                 <div style="background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #667eea;">
                     <strong>Contoh Format:</strong><br>
-                    <code style="display: block; margin-top: 8px; padding: 8px; background: white; border-radius: 4px;">
+                    <code style="display: block; margin-top: 8px; padding: 8px; background: white; border-radius: 4px; font-family: monospace;">
                         Buku Tulis	Buku tulis 38 lembar	5000	100	aktif<br>
-                        Pensil 2B	Pensil 2B Faber Castell	3000	150	aktif<br>
-                        Penghapus	Penghapus Faber Castell	2000	200	nonaktif
+                        Pensil 2B	Pensil 2B Faber Castell	3000	150	aktif
                     </code>
-                    <small style="color: #666; display: block; margin-top: 8px;">
-                        * Status: aktif atau nonaktif (default: aktif jika kosong)<br>
-                        * Harga bisa dengan format: 5000, Rp 5.000, atau 5000.00
-                    </small>
                 </div>
                 
                 <form method="POST">
@@ -477,7 +711,7 @@ try {
                             name="data_paste" 
                             rows="15" 
                             style="font-family: 'Courier New', monospace; font-size: 13px;"
-                            placeholder="Paste data dari spreadsheet di sini...&#10;&#10;Contoh:&#10;Buku Tulis	Buku tulis 38 lembar	5000	100	aktif&#10;Pensil 2B	Pensil 2B Faber Castell	3000	150	aktif"
+                            placeholder="Paste data dari spreadsheet di sini..."
                             required
                         ></textarea>
                     </div>
@@ -495,7 +729,7 @@ try {
                     <input type="hidden" name="action" value="redeem_voucher">
                     
                     <div class="form-group">
-                        <label>Kode Voucher</label>
+                        <label>Kode Voucher *</label>
                         <input type="text" name="voucher_code" required placeholder="Masukkan kode voucher">
                     </div>
 
@@ -506,9 +740,9 @@ try {
             <div class="card">
                 <h2>Daftar Voucher Pending</h2>
                 <?php if (empty($pending_vouchers)): ?>
-                    <p style="text-align: center; color: #666; padding: 40px;">
-                        Tidak ada voucher yang pending.
-                    </p>
+                    <div class="empty-state">
+                        <p>Tidak ada voucher yang pending.</p>
+                    </div>
                 <?php else: ?>
                     <table>
                         <thead>
@@ -523,14 +757,14 @@ try {
                         <tbody>
                             <?php foreach ($pending_vouchers as $voucher): ?>
                                 <tr>
-                                    <td><strong><?= htmlspecialchars($voucher['voucher_code']) ?></strong></td>
-                                    <td><?= htmlspecialchars($voucher['student_name']) ?> (<?= htmlspecialchars($voucher['class']) ?>)</td>
-                                    <td>Rp <?= number_format($voucher['total_harga'], 0, ',', '.') ?></td>
+                                    <td><strong><?= sanitize($voucher['voucher_code']) ?></strong></td>
+                                    <td><?= sanitize($voucher['student_name'] ?? 'N/A') ?> (<?= sanitize($voucher['class'] ?? '-') ?>)</td>
+                                    <td>Rp <?= number_format($voucher['total_harga'] ?? 0, 0, ',', '.') ?></td>
                                     <td><?= date('d/m/Y H:i', strtotime($voucher['created_at'])) ?></td>
                                     <td>
                                         <form method="POST" style="display: inline;">
                                             <input type="hidden" name="action" value="redeem_voucher">
-                                            <input type="hidden" name="voucher_code" value="<?= htmlspecialchars($voucher['voucher_code']) ?>">
+                                            <input type="hidden" name="voucher_code" value="<?= sanitize($voucher['voucher_code']) ?>">
                                             <button type="submit" class="btn btn-success btn-small">Redeem</button>
                                         </form>
                                     </td>
@@ -550,9 +784,9 @@ try {
                     Berikut adalah daftar semua siswa beserta tagihan yang mereka miliki.
                 </p>
                 <?php if (empty($students_with_tagihan)): ?>
-                    <p style="text-align: center; color: #666; padding: 40px;">
-                        Tidak ada data siswa yang ditemukan.
-                    </p>
+                    <div class="empty-state">
+                        <p>Tidak ada data siswa yang ditemukan.</p>
+                    </div>
                 <?php else: ?>
                     <table>
                         <thead>
@@ -569,8 +803,8 @@ try {
                             <?php $no = 1; foreach ($students_with_tagihan as $student): ?>
                                 <tr>
                                     <td><?= $no++ ?></td>
-                                    <td><strong><?= htmlspecialchars($student['name']) ?></strong></td>
-                                    <td><?= htmlspecialchars($student['class'] ?? '-') ?></td>
+                                    <td><strong><?= sanitize($student['name']) ?></strong></td>
+                                    <td><?= sanitize($student['class'] ?? '-') ?></td>
                                     <td>
                                         <span class="badge <?= $student['jumlah_tagihan'] > 0 ? 'badge-warning' : 'badge-success' ?>">
                                             <?= $student['jumlah_tagihan'] ?> tagihan
@@ -579,7 +813,7 @@ try {
                                     <td>
                                         <?php if ($student['jumlah_tagihan'] > 0): ?>
                                             <div style="max-width: 400px;">
-                                                <?= htmlspecialchars($student['list_tagihan']) ?>
+                                                <?= sanitize($student['list_tagihan'] ?? '-') ?>
                                             </div>
                                         <?php else: ?>
                                             <span style="color: #48bb78;">Tidak ada tagihan</span>
@@ -603,9 +837,11 @@ try {
 
     <script>
         function showTab(tabName) {
+            // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             
+            // Show selected tab
             document.getElementById('tab-' + tabName).classList.add('active');
             event.target.classList.add('active');
         }
@@ -619,11 +855,11 @@ try {
                     <input type="hidden" name="id" value="${barang.id}">
                     <div class="form-group">
                         <label>Nama Barang</label>
-                        <input type="text" name="nama_barang" value="${barang.nama_barang}" required>
+                        <input type="text" name="nama_barang" value="${escapeHtml(barang.nama_barang)}" required>
                     </div>
                     <div class="form-group">
                         <label>Deskripsi</label>
-                        <textarea name="deskripsi" rows="3">${barang.deskripsi || ''}</textarea>
+                        <textarea name="deskripsi" rows="3">${escapeHtml(barang.deskripsi || '')}</textarea>
                     </div>
                     <div class="form-group">
                         <label>Harga</label>
@@ -659,18 +895,18 @@ try {
                 };
             }
         }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
     </script>
 </body>
 </html>
 <?php
-if (isset($_GET['logout'])) {
-    session_destroy();
-    header('Location: login_siswa.php');
-    exit;
-}
-
 // Close database connection
-if (isset($conn)) {
+if ($conn) {
     $conn->close();
 }
 ?>
