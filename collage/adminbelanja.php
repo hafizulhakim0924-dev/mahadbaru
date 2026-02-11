@@ -237,6 +237,28 @@ while ($row = $result->fetch_assoc()) {
     $pending_vouchers[] = $row;
 }
 $stmt->close();
+
+// Get students with their tagihan grouped
+$stmt = $conn->prepare("
+    SELECT 
+        s.id,
+        s.name,
+        s.class,
+        COUNT(t.id) as jumlah_tagihan,
+        GROUP_CONCAT(CONCAT(t.nama_tagihan, ' (Rp ', FORMAT(t.jumlah, 0), ')') SEPARATOR ', ') as list_tagihan,
+        SUM(t.jumlah) as total_tagihan
+    FROM students s
+    LEFT JOIN tagihan t ON s.id = t.student_id
+    GROUP BY s.id, s.name, s.class
+    ORDER BY s.name ASC
+");
+$stmt->execute();
+$result = $stmt->get_result();
+$students_with_tagihan = [];
+while ($row = $result->fetch_assoc()) {
+    $students_with_tagihan[] = $row;
+}
+$stmt->close();
 $conn->close();
 ?>
 <!DOCTYPE html>
@@ -299,6 +321,7 @@ $conn->close();
             <button class="tab-btn active" onclick="showTab('barang')">Kelola Barang</button>
             <button class="tab-btn" onclick="showTab('import')">Import Barang</button>
             <button class="tab-btn" onclick="showTab('voucher')">Redeem Voucher</button>
+            <button class="tab-btn" onclick="showTab('tagihan')">Daftar Siswa & Tagihan</button>
         </div>
 
         <!-- Tab Kelola Barang -->
@@ -485,6 +508,64 @@ $conn->close();
                 <?php endif; ?>
             </div>
         </div>
+
+        <!-- Tab Daftar Siswa & Tagihan -->
+        <div id="tab-tagihan" class="tab-content">
+            <div class="card">
+                <h2>Daftar Siswa dan Tagihan</h2>
+                <p style="margin-bottom: 20px; color: #666;">
+                    Berikut adalah daftar semua siswa beserta tagihan yang mereka miliki.
+                </p>
+                <?php if (empty($students_with_tagihan)): ?>
+                    <p style="text-align: center; color: #666; padding: 40px;">
+                        Tidak ada data siswa yang ditemukan.
+                    </p>
+                <?php else: ?>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Nama Siswa</th>
+                                <th>Kelas</th>
+                                <th>Jumlah Tagihan</th>
+                                <th>List Tagihan</th>
+                                <th>Total Tagihan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php $no = 1; foreach ($students_with_tagihan as $student): ?>
+                                <tr>
+                                    <td><?= $no++ ?></td>
+                                    <td><strong><?= htmlspecialchars($student['name']) ?></strong></td>
+                                    <td><?= htmlspecialchars($student['class'] ?? '-') ?></td>
+                                    <td>
+                                        <span class="badge <?= $student['jumlah_tagihan'] > 0 ? 'badge-warning' : 'badge-success' ?>">
+                                            <?= $student['jumlah_tagihan'] ?> tagihan
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <?php if ($student['jumlah_tagihan'] > 0): ?>
+                                            <div style="max-width: 400px;">
+                                                <?= htmlspecialchars($student['list_tagihan']) ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <span style="color: #48bb78;">Tidak ada tagihan</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($student['total_tagihan'] > 0): ?>
+                                            <strong style="color: #e53e3e;">Rp <?= number_format($student['total_tagihan'], 0, ',', '.') ?></strong>
+                                        <?php else: ?>
+                                            <span style="color: #48bb78;">Rp 0</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -551,7 +632,7 @@ $conn->close();
 <?php
 if (isset($_GET['logout'])) {
     session_destroy();
-    header('Location: adminbelanja.php');
+    header('Location: login_siswa.php');
     exit;
 }
 ?>

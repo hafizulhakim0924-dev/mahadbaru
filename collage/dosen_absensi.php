@@ -657,7 +657,7 @@ $stmt->close();
 <?php
 if (isset($_GET['logout'])) {
     session_destroy();
-    header('Location: dosen_absensi.php');
+    header('Location: login_siswa.php');
     exit;
 }
 
