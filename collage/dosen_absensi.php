@@ -600,20 +600,46 @@ $stmt->close();
                 <h2>Import Tagihan Massal</h2>
                 <p style="margin-bottom: 20px; color: #666;">
                     <strong>Cara penggunaan:</strong><br>
-                    1. Lihat daftar siswa di tabel di bawah<br>
-                    2. Pada kolom "Paste Tagihan", paste data tagihan untuk siswa tersebut<br>
-                    3. Format: <strong>Nama Tagihan 1 | Jumlah 1 | Nama Tagihan 2 | Jumlah 2 | ...</strong><br>
-                    4. Dipisah dengan <strong>Tab</strong> atau <strong>Koma (,)</strong><br>
-                    5. Contoh: <code>SPP Januari	500000	SPP Februari	500000	Uang Gedung	2000000</code>
+                    1. Copy semua data dari spreadsheet (termasuk ID, Nama, dan Tagihan)<br>
+                    2. Paste di textarea "Paste Data dari Spreadsheet" di bawah<br>
+                    3. Format: <strong>ID | Nama | Kelas | Nama Tagihan 1 | Jumlah 1 | Nama Tagihan 2 | Jumlah 2 | ...</strong><br>
+                    4. Klik "Auto Fill ke Tabel" untuk mengisi otomatis ke tabel<br>
+                    5. Atau paste langsung per baris di kolom "Paste Tagihan"<br>
+                    6. Klik "Import Tagihan" untuk menyimpan
                 </p>
                 
                 <div style="background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #667eea;">
-                    <strong>Catatan:</strong><br>
-                    <small style="color: #666;">
-                        * Setiap baris siswa memiliki kolom sendiri untuk paste tagihan<br>
-                        * Tidak perlu menulis ID lagi, karena sudah otomatis sesuai dengan baris siswa<br>
-                        * Bisa paste langsung dari spreadsheet (copy kolom tagihan saja, tanpa ID)
+                    <strong>Contoh Format dari Spreadsheet:</strong><br>
+                    <code style="display: block; margin-top: 8px; padding: 8px; background: white; border-radius: 4px; font-size: 12px; font-family: monospace;">
+                        1	Ahmad Zaki	X IPA 1	SPP Januari	500000	SPP Februari	500000	Uang Gedung	2000000<br>
+                        2	Siti Nurhaliza	X IPA 1	SPP Januari	500000	SPP Maret	500000<br>
+                        3	Budi Santoso	XI IPS 1	SPP Januari	500000	SPP Februari	500000	SPP Maret	500000
+                    </code>
+                    <small style="color: #666; display: block; margin-top: 8px;">
+                        * Format: ID | Nama | Kelas | Nama Tagihan | Jumlah | Nama Tagihan | Jumlah | ...<br>
+                        * Bisa paste 100+ baris sekaligus, sistem akan otomatis mengisi ke tabel yang sesuai
                     </small>
+                </div>
+                
+                <!-- Area Paste Massal -->
+                <div style="background: #fff9e6; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #ffc107;">
+                    <label style="display: block; margin-bottom: 10px; font-weight: 600; color: #2d3748;">
+                        📋 Paste Data dari Spreadsheet (Semua Baris Sekaligus)
+                    </label>
+                    <textarea 
+                        id="bulk_paste_area" 
+                        rows="8" 
+                        style="width: 100%; font-family: 'Courier New', monospace; font-size: 13px; padding: 10px; border: 2px solid #ffc107; border-radius: 5px;"
+                        placeholder="Paste semua data dari spreadsheet di sini...&#10;&#10;Contoh:&#10;1	Ahmad Zaki	X IPA 1	SPP Januari	500000	SPP Februari	500000&#10;2	Siti Nurhaliza	X IPA 1	SPP Januari	500000"
+                    ></textarea>
+                    <div style="margin-top: 10px;">
+                        <button type="button" class="btn" onclick="autoFillFromBulk()" style="background: #ffc107; color: #000;">
+                            🔄 Auto Fill ke Tabel
+                        </button>
+                        <button type="button" class="btn" onclick="clearBulkPaste()" style="background: #6c757d; margin-left: 10px;">
+                            Clear
+                        </button>
+                    </div>
                 </div>
                 
                 <form method="POST" id="form_import_tagihan">
@@ -638,7 +664,7 @@ $stmt->close();
                                     </tr>
                                 <?php else: ?>
                                     <?php foreach ($students as $student): ?>
-                                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                                        <tr style="border-bottom: 1px solid #e2e8f0;" data-student-id="<?= $student['id'] ?>" data-student-name="<?= htmlspecialchars(strtolower($student['name'])) ?>">
                                             <td style="padding: 10px; font-weight: 600; color: #667eea; vertical-align: top;">
                                                 <?= htmlspecialchars($student['id']) ?>
                                             </td>
@@ -651,6 +677,7 @@ $stmt->close();
                                             <td style="padding: 10px; vertical-align: top;">
                                                 <textarea 
                                                     name="tagihan[<?= $student['id'] ?>]" 
+                                                    id="tagihan_<?= $student['id'] ?>"
                                                     rows="2" 
                                                     style="width: 100%; font-family: 'Courier New', monospace; font-size: 12px; padding: 8px; border: 1px solid #cbd5e0; border-radius: 4px; resize: vertical;"
                                                     placeholder="Contoh: SPP Januari	500000	SPP Februari	500000"
@@ -688,6 +715,80 @@ $stmt->close();
                     textarea.value = '';
                 });
             }
+        }
+        
+        function clearBulkPaste() {
+            document.getElementById('bulk_paste_area').value = '';
+        }
+        
+        function autoFillFromBulk() {
+            const bulkData = document.getElementById('bulk_paste_area').value.trim();
+            if (!bulkData) {
+                alert('Silakan paste data terlebih dahulu!');
+                return;
+            }
+            
+            const lines = bulkData.split('\n');
+            let filledCount = 0;
+            let notFoundCount = 0;
+            const notFoundIds = [];
+            
+            lines.forEach((line, lineNum) => {
+                const trimmedLine = line.trim();
+                if (!trimmedLine) return;
+                
+                // Deteksi separator: tab atau koma
+                let cols;
+                if (trimmedLine.indexOf('\t') !== -1) {
+                    cols = trimmedLine.split('\t');
+                } else {
+                    cols = trimmedLine.split(',');
+                }
+                
+                cols = cols.map(col => col.trim()).filter(col => col);
+                
+                if (cols.length < 3) {
+                    return; // Skip jika tidak lengkap
+                }
+                
+                // Ambil ID (kolom pertama)
+                const studentId = parseInt(cols[0]);
+                if (isNaN(studentId) || studentId <= 0) {
+                    return; // Skip jika ID tidak valid
+                }
+                
+                // Cari textarea dengan ID yang sesuai
+                const textarea = document.getElementById('tagihan_' + studentId);
+                if (textarea) {
+                    // Ambil data tagihan (mulai dari kolom 4, setelah ID, Nama, Kelas)
+                    // Format: ID | Nama | Kelas | Tagihan1 | Jumlah1 | Tagihan2 | Jumlah2 | ...
+                    const tagihanData = cols.slice(3); // Skip ID, Nama, Kelas
+                    
+                    if (tagihanData.length > 0) {
+                        // Gabungkan dengan tab atau koma sesuai separator asli
+                        const separator = trimmedLine.indexOf('\t') !== -1 ? '\t' : ',';
+                        textarea.value = tagihanData.join(separator);
+                        filledCount++;
+                        
+                        // Highlight row untuk feedback visual
+                        const row = textarea.closest('tr');
+                        row.style.backgroundColor = '#d4edda';
+                        setTimeout(() => {
+                            row.style.backgroundColor = '';
+                        }, 2000);
+                    }
+                } else {
+                    notFoundCount++;
+                    notFoundIds.push(studentId);
+                }
+            });
+            
+            // Tampilkan hasil
+            let message = `Berhasil mengisi ${filledCount} baris!`;
+            if (notFoundCount > 0) {
+                message += `\n\n${notFoundCount} ID tidak ditemukan: ${notFoundIds.slice(0, 10).join(', ')}${notFoundIds.length > 10 ? '...' : ''}`;
+            }
+            alert(message);
         }
     </script>
 </body>
