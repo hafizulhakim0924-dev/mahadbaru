@@ -229,63 +229,55 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             }
         }
     } elseif ($_POST['action'] == 'import_tagihan') {
-        // Import tagihan massal dari spreadsheet
-        $data_paste = trim($_POST['data_paste'] ?? '');
+        // Import tagihan massal dari format baru (setiap siswa punya textarea sendiri)
+        $tagihan_input = $_POST['tagihan'] ?? [];
+        $tagihan_data = [];
+        $errors = [];
+        $success_count = 0;
         
-        if (empty($data_paste)) {
-            $error = "Data tidak boleh kosong!";
+        if (empty($tagihan_input)) {
+            $error = "Tidak ada data tagihan yang diinput!";
         } else {
-            $lines = explode("\n", $data_paste);
-            $tagihan_data = [];
-            $errors = [];
-            $success_count = 0;
-            
-            foreach ($lines as $line_num => $line) {
-                $line = trim($line);
-                if (empty($line)) continue;
+            foreach ($tagihan_input as $student_id => $data_paste) {
+                $student_id = intval($student_id);
+                $data_paste = trim($data_paste);
                 
-                // Deteksi separator: tab atau koma
-                if (strpos($line, "\t") !== false) {
-                    $cols = explode("\t", $line);
-                } else {
-                    $cols = explode(",", $line);
+                if (empty($data_paste)) {
+                    continue; // Skip jika kosong
                 }
                 
-                $cols = array_map('trim', $cols);
-                
-                // Skip header
-                if ($line_num == 0 && (strtolower($cols[0]) == 'student_id' || strtolower($cols[0]) == 'id' || strtolower($cols[0]) == 'nama')) {
-                    continue;
-                }
-                
-                // Format: student_id, nama_tagihan, jumlah, keterangan
-                // Atau: student_id, nama_tagihan1, jumlah1, nama_tagihan2, jumlah2, ... (multiple tagihan per student)
-                if (count($cols) < 3) {
-                    $errors[] = "Baris " . ($line_num + 1) . ": Data tidak lengkap (minimal: ID, Nama Tagihan, Jumlah)";
-                    continue;
-                }
-                
-                $student_id = intval($cols[0] ?? 0);
                 if ($student_id <= 0) {
-                    $errors[] = "Baris " . ($line_num + 1) . ": ID siswa tidak valid";
+                    $errors[] = "ID siswa tidak valid: $student_id";
                     continue;
                 }
                 
                 // Cek apakah student_id ada
-                $stmt_check = $conn->prepare("SELECT id FROM students WHERE id = ?");
+                $stmt_check = $conn->prepare("SELECT id, name FROM students WHERE id = ?");
                 $stmt_check->bind_param("i", $student_id);
                 $stmt_check->execute();
                 $result_check = $stmt_check->get_result();
                 if ($result_check->num_rows == 0) {
-                    $errors[] = "Baris " . ($line_num + 1) . ": Student ID $student_id tidak ditemukan";
+                    $errors[] = "Student ID $student_id tidak ditemukan";
                     $stmt_check->close();
                     continue;
                 }
+                $student_info = $result_check->fetch_assoc();
                 $stmt_check->close();
                 
-                // Parse multiple tagihan (format: id, tagihan1, jumlah1, tagihan2, jumlah2, ...)
-                // Format sederhana: setiap pasangan nama_tagihan dan jumlah
-                $idx = 1;
+                // Parse data tagihan (format: nama_tagihan, jumlah, nama_tagihan, jumlah, ...)
+                // Deteksi separator: tab atau koma
+                if (strpos($data_paste, "\t") !== false) {
+                    $cols = explode("\t", $data_paste);
+                } else {
+                    $cols = explode(",", $data_paste);
+                }
+                
+                $cols = array_map('trim', $cols);
+                $cols = array_filter($cols); // Hapus empty values
+                $cols = array_values($cols); // Re-index
+                
+                // Parse pasangan nama_tagihan dan jumlah
+                $idx = 0;
                 while ($idx < count($cols) - 1) {
                     $nama_tagihan = trim($cols[$idx] ?? '');
                     
@@ -299,7 +291,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     $jumlah = floatval(str_replace(['Rp', 'rp', '.', ','], '', $jumlah_str));
                     
                     if ($jumlah <= 0) {
-                        $errors[] = "Baris " . ($line_num + 1) . ": Jumlah tagihan '$nama_tagihan' tidak valid";
+                        $errors[] = "Siswa " . $student_info['name'] . " (ID: $student_id): Jumlah tagihan '$nama_tagihan' tidak valid";
                         $idx += 2;
                         continue;
                     }
@@ -308,16 +300,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     $keterangan = '';
                     if (isset($cols[$idx + 2])) {
                         $next_col = trim($cols[$idx + 2]);
-                        // Jika kolom berikutnya bukan angka, anggap sebagai keterangan
                         $next_col_clean = str_replace(['Rp', 'rp', '.', ','], '', $next_col);
                         if (!empty($next_col) && !is_numeric($next_col_clean)) {
                             $keterangan = $next_col;
-                            $idx += 3; // Skip: nama_tagihan, jumlah, keterangan
+                            $idx += 3;
                         } else {
-                            $idx += 2; // Skip: nama_tagihan, jumlah
+                            $idx += 2;
                         }
                     } else {
-                        $idx += 2; // Skip: nama_tagihan, jumlah
+                        $idx += 2;
                     }
                     
                     $tagihan_data[] = [
@@ -357,18 +348,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                         $conn->commit();
                         $success = "Berhasil mengimport $success_count tagihan!";
                         if (!empty($errors)) {
-                            $error = "Beberapa data gagal diimport:<br>" . implode("<br>", array_map('htmlspecialchars', $errors));
+                            $error = "Beberapa data gagal diimport:<br>" . implode("<br>", array_map('htmlspecialchars', array_slice($errors, 0, 10)));
                         }
                     } else {
                         $conn->rollback();
-                        $error = "Tidak ada data yang berhasil diimport.<br>" . implode("<br>", array_map('htmlspecialchars', $errors));
+                        $error = "Tidak ada data yang berhasil diimport.<br>" . implode("<br>", array_map('htmlspecialchars', array_slice($errors, 0, 10)));
                     }
                 } catch (Exception $e) {
                     $conn->rollback();
                     $error = "Error: " . $e->getMessage();
                 }
             } else {
-                $error = "Tidak ada data valid untuk diimport.<br>" . implode("<br>", array_map('htmlspecialchars', $errors));
+                $error = "Tidak ada data valid untuk diimport. Pastikan format tagihan benar (Nama Tagihan | Jumlah).";
             }
         }
     }
@@ -609,79 +600,73 @@ $stmt->close();
                 <h2>Import Tagihan Massal</h2>
                 <p style="margin-bottom: 20px; color: #666;">
                     <strong>Cara penggunaan:</strong><br>
-                    1. Lihat daftar siswa di kolom kiri (ID dan Nama)<br>
-                    2. Copy data tagihan dari spreadsheet (Excel/Google Sheets)<br>
-                    3. Paste di textarea kanan dengan format: <strong>ID | Nama Tagihan 1 | Jumlah 1 | Nama Tagihan 2 | Jumlah 2 | ...</strong><br>
+                    1. Lihat daftar siswa di tabel di bawah<br>
+                    2. Pada kolom "Paste Tagihan", paste data tagihan untuk siswa tersebut<br>
+                    3. Format: <strong>Nama Tagihan 1 | Jumlah 1 | Nama Tagihan 2 | Jumlah 2 | ...</strong><br>
                     4. Dipisah dengan <strong>Tab</strong> atau <strong>Koma (,)</strong><br>
-                    5. Satu baris = satu student dengan multiple tagihan
+                    5. Contoh: <code>SPP Januari	500000	SPP Februari	500000	Uang Gedung	2000000</code>
                 </p>
                 
                 <div style="background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #667eea;">
-                    <strong>Contoh Format:</strong><br>
-                    <code style="display: block; margin-top: 8px; padding: 8px; background: white; border-radius: 4px; font-size: 12px;">
-                        1	SPP Januari	500000	SPP Februari	500000	SPP Maret	500000<br>
-                        2	SPP Januari	500000	Uang Gedung	2000000
-                    </code>
-                    <small style="color: #666; display: block; margin-top: 8px;">
-                        * Format: Student ID (lihat di kolom kiri), kemudian pasangan Nama Tagihan dan Jumlah<br>
-                        * Gunakan ID yang sesuai dengan daftar siswa di kolom kiri
+                    <strong>Catatan:</strong><br>
+                    <small style="color: #666;">
+                        * Setiap baris siswa memiliki kolom sendiri untuk paste tagihan<br>
+                        * Tidak perlu menulis ID lagi, karena sudah otomatis sesuai dengan baris siswa<br>
+                        * Bisa paste langsung dari spreadsheet (copy kolom tagihan saja, tanpa ID)
                     </small>
                 </div>
                 
-                <form method="POST">
+                <form method="POST" id="form_import_tagihan">
                     <input type="hidden" name="action" value="import_tagihan">
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                        <!-- Kolom Kiri: Daftar Siswa -->
-                        <div>
-                            <label style="display: block; margin-bottom: 10px; font-weight: 600; color: #2d3748;">Daftar Siswa (ID & Nama)</label>
-                            <div style="background: #f8f9fa; border: 1px solid #cbd5e0; border-radius: 5px; padding: 10px; max-height: 500px; overflow-y: auto;">
-                                <table style="width: 100%; font-size: 13px;">
-                                    <thead>
-                                        <tr style="background: #667eea; color: white;">
-                                            <th style="padding: 8px; text-align: left;">ID</th>
-                                            <th style="padding: 8px; text-align: left;">Nama</th>
-                                            <th style="padding: 8px; text-align: left;">Kelas</th>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="background: #667eea; color: white; padding: 12px; text-align: left; font-weight: 600; min-width: 60px;">ID</th>
+                                    <th style="background: #667eea; color: white; padding: 12px; text-align: left; font-weight: 600; min-width: 200px;">Nama</th>
+                                    <th style="background: #667eea; color: white; padding: 12px; text-align: left; font-weight: 600; min-width: 120px;">Kelas</th>
+                                    <th style="background: #667eea; color: white; padding: 12px; text-align: left; font-weight: 600; min-width: 400px;">Paste Tagihan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($students)): ?>
+                                    <tr>
+                                        <td colspan="4" style="padding: 20px; text-align: center; color: #666;">
+                                            Tidak ada data siswa
+                                        </td>
+                                    </tr>
+                                <?php else: ?>
+                                    <?php foreach ($students as $student): ?>
+                                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                                            <td style="padding: 10px; font-weight: 600; color: #667eea; vertical-align: top;">
+                                                <?= htmlspecialchars($student['id']) ?>
+                                            </td>
+                                            <td style="padding: 10px; vertical-align: top;">
+                                                <?= htmlspecialchars($student['name']) ?>
+                                            </td>
+                                            <td style="padding: 10px; color: #666; vertical-align: top;">
+                                                <?= htmlspecialchars($student['class'] ?? '-') ?>
+                                            </td>
+                                            <td style="padding: 10px; vertical-align: top;">
+                                                <textarea 
+                                                    name="tagihan[<?= $student['id'] ?>]" 
+                                                    rows="2" 
+                                                    style="width: 100%; font-family: 'Courier New', monospace; font-size: 12px; padding: 8px; border: 1px solid #cbd5e0; border-radius: 4px; resize: vertical;"
+                                                    placeholder="Contoh: SPP Januari	500000	SPP Februari	500000"
+                                                ></textarea>
+                                            </td>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php if (empty($students)): ?>
-                                            <tr>
-                                                <td colspan="3" style="padding: 15px; text-align: center; color: #666;">
-                                                    Tidak ada data siswa
-                                                </td>
-                                            </tr>
-                                        <?php else: ?>
-                                            <?php foreach ($students as $student): ?>
-                                                <tr style="border-bottom: 1px solid #e2e8f0;">
-                                                    <td style="padding: 8px; font-weight: 600; color: #667eea;"><?= htmlspecialchars($student['id']) ?></td>
-                                                    <td style="padding: 8px;"><?= htmlspecialchars($student['name']) ?></td>
-                                                    <td style="padding: 8px; color: #666;"><?= htmlspecialchars($student['class'] ?? '-') ?></td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        <?php endif; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        
-                        <!-- Kolom Kanan: Paste Tagihan -->
-                        <div>
-                            <label style="display: block; margin-bottom: 10px; font-weight: 600; color: #2d3748;">Paste Data Tagihan</label>
-                            <textarea 
-                                name="data_paste" 
-                                rows="20" 
-                                style="width: 100%; font-family: 'Courier New', monospace; font-size: 13px; padding: 10px; border: 1px solid #cbd5e0; border-radius: 5px;"
-                                placeholder="Paste data tagihan di sini...&#10;&#10;Contoh:&#10;1	SPP Januari	500000	SPP Februari	500000&#10;2	SPP Januari	500000	Uang Gedung	2000000"
-                                required
-                            ></textarea>
-                            <small style="color: #666; display: block; margin-top: 5px;">
-                                Gunakan ID yang sesuai dengan daftar siswa di kolom kiri
-                            </small>
-                        </div>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
                     </div>
 
-                    <button type="submit" class="btn">Import Tagihan</button>
+                    <div style="margin-top: 20px;">
+                        <button type="submit" class="btn">Import Tagihan</button>
+                        <button type="button" class="btn" onclick="clearAllTagihan()" style="background: #e53e3e; margin-left: 10px;">Clear All</button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -694,6 +679,15 @@ $stmt->close();
             
             document.getElementById('tab-' + tabName).classList.add('active');
             event.target.classList.add('active');
+        }
+        
+        function clearAllTagihan() {
+            if (confirm('Yakin ingin menghapus semua input tagihan?')) {
+                const textareas = document.querySelectorAll('textarea[name^="tagihan["]');
+                textareas.forEach(textarea => {
+                    textarea.value = '';
+                });
+            }
         }
     </script>
 </body>
