@@ -85,19 +85,28 @@ function getBarangList($conn) {
     try {
         $stmt = $conn->prepare("SELECT * FROM barang ORDER BY nama_barang ASC");
         if ($stmt) {
-            $stmt->execute();
-            $result = $stmt->get_result();
-            while ($row = $result->fetch_assoc()) {
-                $barang_list[] = $row;
+            if ($stmt->execute()) {
+                $result = $stmt->get_result();
+                if ($result) {
+                    while ($row = $result->fetch_assoc()) {
+                        $barang_list[] = $row;
+                    }
+                } else {
+                    $error_msg = "Error getting result: " . $conn->error;
+                    error_log("AdminBelanja - getBarangList: " . $error_msg);
+                }
+            } else {
+                $error_msg = "Error executing query: " . $stmt->error;
+                error_log("AdminBelanja - getBarangList: " . $error_msg);
             }
             $stmt->close();
         } else {
             $error_msg = "Error preparing barang query: " . $conn->error;
-            error_log("AdminBelanja: " . $error_msg);
+            error_log("AdminBelanja - getBarangList: " . $error_msg);
         }
     } catch (Exception $e) {
         $error_msg = "Error getting barang list: " . $e->getMessage();
-        error_log("AdminBelanja: " . $error_msg);
+        error_log("AdminBelanja - getBarangList Exception: " . $error_msg);
     }
     return $barang_list;
 }
@@ -117,19 +126,28 @@ function getPendingVouchers($conn) {
             ORDER BY v.created_at DESC
         ");
         if ($stmt) {
-            $stmt->execute();
-            $result = $stmt->get_result();
-            while ($row = $result->fetch_assoc()) {
-                $vouchers[] = $row;
+            if ($stmt->execute()) {
+                $result = $stmt->get_result();
+                if ($result) {
+                    while ($row = $result->fetch_assoc()) {
+                        $vouchers[] = $row;
+                    }
+                } else {
+                    $error_msg = "Error getting result: " . $conn->error;
+                    error_log("AdminBelanja - getPendingVouchers: " . $error_msg);
+                }
+            } else {
+                $error_msg = "Error executing query: " . $stmt->error;
+                error_log("AdminBelanja - getPendingVouchers: " . $error_msg);
             }
             $stmt->close();
         } else {
             $error_msg = "Error preparing vouchers query: " . $conn->error;
-            error_log("AdminBelanja: " . $error_msg);
+            error_log("AdminBelanja - getPendingVouchers: " . $error_msg);
         }
     } catch (Exception $e) {
         $error_msg = "Error getting vouchers: " . $e->getMessage();
-        error_log("AdminBelanja: " . $error_msg);
+        error_log("AdminBelanja - getPendingVouchers Exception: " . $error_msg);
     }
     return $vouchers;
 }
@@ -154,19 +172,28 @@ function getStudentsWithTagihan($conn) {
             ORDER BY s.name ASC
         ");
         if ($stmt) {
-            $stmt->execute();
-            $result = $stmt->get_result();
-            while ($row = $result->fetch_assoc()) {
-                $students[] = $row;
+            if ($stmt->execute()) {
+                $result = $stmt->get_result();
+                if ($result) {
+                    while ($row = $result->fetch_assoc()) {
+                        $students[] = $row;
+                    }
+                } else {
+                    $error_msg = "Error getting result: " . $conn->error;
+                    error_log("AdminBelanja - getStudentsWithTagihan: " . $error_msg);
+                }
+            } else {
+                $error_msg = "Error executing query: " . $stmt->error;
+                error_log("AdminBelanja - getStudentsWithTagihan: " . $error_msg);
             }
             $stmt->close();
         } else {
             $error_msg = "Error preparing students query: " . $conn->error;
-            error_log("AdminBelanja: " . $error_msg);
+            error_log("AdminBelanja - getStudentsWithTagihan: " . $error_msg);
         }
     } catch (Exception $e) {
         $error_msg = "Error getting students with tagihan: " . $e->getMessage();
-        error_log("AdminBelanja: " . $error_msg);
+        error_log("AdminBelanja - getStudentsWithTagihan Exception: " . $error_msg);
     }
     return $students;
 }
