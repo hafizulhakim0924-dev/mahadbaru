@@ -20,6 +20,10 @@ if ($conn->connect_error) {
 }
 $conn->set_charset("utf8mb4");
 
+// Initialize variables
+$success = '';
+$error = '';
+
 $admin_id = $_SESSION['admin_id'];
 $admin_nama = $_SESSION['admin_nama'];
 
@@ -212,54 +216,83 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
 }
 
 // Get all barang
-$stmt = $conn->prepare("SELECT * FROM barang ORDER BY nama_barang ASC");
-$stmt->execute();
-$result = $stmt->get_result();
 $barang_list = [];
-while ($row = $result->fetch_assoc()) {
-    $barang_list[] = $row;
+try {
+    $stmt = $conn->prepare("SELECT * FROM barang ORDER BY nama_barang ASC");
+    if ($stmt) {
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $barang_list[] = $row;
+        }
+        $stmt->close();
+    } else {
+        $error = "Error preparing query: " . $conn->error;
+    }
+} catch (Exception $e) {
+    $error = "Error fetching barang: " . $e->getMessage();
 }
-$stmt->close();
 
 // Get pending vouchers
-$stmt = $conn->prepare("
-    SELECT v.*, s.name as student_name, s.class, p.total_harga 
-    FROM voucher_pembayaran v
-    LEFT JOIN students s ON v.student_id = s.id
-    LEFT JOIN pesanan_belanja p ON v.pesanan_id = p.id
-    WHERE v.status = 'pending'
-    ORDER BY v.created_at DESC
-");
-$stmt->execute();
-$result = $stmt->get_result();
 $pending_vouchers = [];
-while ($row = $result->fetch_assoc()) {
-    $pending_vouchers[] = $row;
+try {
+    $stmt = $conn->prepare("
+        SELECT v.*, s.name as student_name, s.class, p.total_harga 
+        FROM voucher_pembayaran v
+        LEFT JOIN students s ON v.student_id = s.id
+        LEFT JOIN pesanan_belanja p ON v.pesanan_id = p.id
+        WHERE v.status = 'pending'
+        ORDER BY v.created_at DESC
+    ");
+    if ($stmt) {
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $pending_vouchers[] = $row;
+        }
+        $stmt->close();
+    } else {
+        // Table might not exist, set empty array
+        $pending_vouchers = [];
+    }
+} catch (Exception $e) {
+    // Table might not exist, set empty array
+    $pending_vouchers = [];
 }
-$stmt->close();
 
 // Get students with their tagihan grouped
-$stmt = $conn->prepare("
-    SELECT 
-        s.id,
-        s.name,
-        s.class,
-        COUNT(t.id) as jumlah_tagihan,
-        GROUP_CONCAT(CONCAT(t.nama_tagihan, ' (Rp ', FORMAT(t.jumlah, 0), ')') SEPARATOR ', ') as list_tagihan,
-        SUM(t.jumlah) as total_tagihan
-    FROM students s
-    LEFT JOIN tagihan t ON s.id = t.student_id
-    GROUP BY s.id, s.name, s.class
-    ORDER BY s.name ASC
-");
-$stmt->execute();
-$result = $stmt->get_result();
 $students_with_tagihan = [];
-while ($row = $result->fetch_assoc()) {
-    $students_with_tagihan[] = $row;
+try {
+    $stmt = $conn->prepare("
+        SELECT 
+            s.id,
+            s.name,
+            s.class,
+            COUNT(t.id) as jumlah_tagihan,
+            GROUP_CONCAT(CONCAT(t.nama_tagihan, ' (Rp ', FORMAT(t.jumlah, 0), ')') SEPARATOR ', ') as list_tagihan,
+            SUM(t.jumlah) as total_tagihan
+        FROM students s
+        LEFT JOIN tagihan t ON s.id = t.student_id
+        GROUP BY s.id, s.name, s.class
+        ORDER BY s.name ASC
+    ");
+    if ($stmt) {
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $students_with_tagihan[] = $row;
+        }
+        $stmt->close();
+    } else {
+        // Table might not exist, set empty array
+        $students_with_tagihan = [];
+    }
+} catch (Exception $e) {
+    // Table might not exist, set empty array
+    $students_with_tagihan = [];
 }
-$stmt->close();
-$conn->close();
+
+// Don't close connection here, close it at the end of file
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -634,6 +667,11 @@ if (isset($_GET['logout'])) {
     session_destroy();
     header('Location: login_siswa.php');
     exit;
+}
+
+// Close database connection
+if (isset($conn)) {
+    $conn->close();
 }
 ?>
 
