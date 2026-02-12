@@ -2215,6 +2215,9 @@ input, textarea, select {
                 
                 ?>
                 
+                <!-- Hidden CSRF Token for Belanja -->
+                <input type="hidden" id="csrf_token_belanja" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+                
                 <div style="padding: 8px 12px;">
                     <?php if ($belanja_error): ?>
                         <div class="empty-state" style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px;">
@@ -2477,6 +2480,7 @@ input, textarea, select {
         let billData = <?= json_encode($student_bills) ?>;
         let pollingInterval = null;
         let currentPaymentId = null;
+        let csrfToken = '<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES) ?>';
 
         function toggleBill(bill) {
             const checkbox = document.querySelector(`input[value="${bill}"]`);
@@ -3179,6 +3183,23 @@ input, textarea, select {
             const modal = document.getElementById('belanja-payment-modal');
             const modalBody = document.getElementById('belanja-payment-body');
             
+            if (!modal || !modalBody) {
+                alert('Error: Modal tidak ditemukan');
+                return;
+            }
+            
+            // Pastikan paymentMethods tersedia
+            if (typeof paymentMethods === 'undefined' || !Array.isArray(paymentMethods)) {
+                console.error('paymentMethods tidak terdefinisi, menggunakan fallback');
+                paymentMethods = [
+                    {code: 'QRIS', name: 'QRIS'},
+                    {code: 'BRIVA', name: 'BRI Virtual Account'},
+                    {code: 'BNIVA', name: 'BNI Virtual Account'},
+                    {code: 'MANDIRIVA', name: 'Mandiri Virtual Account'},
+                    {code: 'BCAVA', name: 'BCA Virtual Account'}
+                ];
+            }
+            
             let methodsHtml = '<option value="">Pilih Metode Pembayaran</option>';
             paymentMethods.forEach(method => {
                 methodsHtml += `<option value="${method.code}">${method.name}</option>`;
@@ -3206,21 +3227,55 @@ input, textarea, select {
         }
         
         async function processBelanjaPayment() {
-            const method = document.getElementById('belanja-payment-method').value;
+            const methodSelect = document.getElementById('belanja-payment-method');
+            if (!methodSelect) {
+                alert('Error: Elemen metode pembayaran tidak ditemukan');
+                return;
+            }
+            
+            const method = methodSelect.value;
             if (!method) {
                 alert('Pilih metode pembayaran terlebih dahulu');
                 return;
             }
             
             const payBtn = document.getElementById('belanja-pay-btn');
+            if (!payBtn) {
+                alert('Error: Tombol pembayaran tidak ditemukan');
+                return;
+            }
+            
             const originalText = payBtn.textContent;
             payBtn.textContent = 'Memproses...';
             payBtn.disabled = true;
             
             try {
+                // Get CSRF token - cek beberapa kemungkinan lokasi
+                let csrfTokenValue = '';
+                
+                // Prioritas 1: dari variable global
+                if (typeof csrfToken !== 'undefined' && csrfToken) {
+                    csrfTokenValue = csrfToken;
+                }
+                // Prioritas 2: dari hidden input
+                else {
+                    const csrfInput = document.querySelector('input[name="csrf_token"]') || document.getElementById('csrf_token_belanja');
+                    if (csrfInput) {
+                        csrfTokenValue = csrfInput.value;
+                    }
+                }
+                
+                if (!csrfTokenValue) {
+                    console.error('CSRF token not found');
+                    alert('Error: Token keamanan tidak ditemukan. Silakan refresh halaman.');
+                    payBtn.textContent = originalText;
+                    payBtn.disabled = false;
+                    return;
+                }
+                
                 const formData = new FormData();
                 formData.append('action', 'create_belanja_payment');
-                formData.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+                formData.append('csrf_token', csrfTokenValue);
                 formData.append('cart', JSON.stringify(cart));
                 formData.append('method', method);
                 
