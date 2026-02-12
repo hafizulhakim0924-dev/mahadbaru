@@ -185,9 +185,9 @@ $student_id = isset($_SESSION['student']['id'])
     : intval($_SESSION['user_id']);
 
 // Tripay Config
-define('TRIPAY_API_KEY', 'Hfdqxnb7S2wPkU9AwghJkBoP7BwUmeZ5emhGC0rQ');
-define('TRIPAY_PRIVATE_KEY', 'peyOY-QK9Bw-dTcOF-ISsZV-kHZvx');
-define('TRIPAY_MERCHANT_CODE', 'T47104');
+define('TRIPAY_API_KEY', 'ytprKupP1zxpZg6XeFBkpe6oJjrT7jaae1zROemR');
+define('TRIPAY_PRIVATE_KEY', 'RlGRM-dPVm0-4gxYN-AakNR-pI3Li');
+define('TRIPAY_MERCHANT_CODE', 'T47806');
 define('TRIPAY_API_URL', 'https://tripay.co.id/api');
 
 // Payment Config
@@ -274,7 +274,7 @@ function createTripayPayment($amount, $order_id, $customer_name, $customer_email
         'return_url' => 'https://ypi-khairaummah.sch.id/profile.php?tab=bayar',
         'expired_time' => (time() + (PAYMENT_EXPIRY_HOURS * 3600)),
         'signature' => $signature,
-        'callback_url' => 'http://kolaboraksi.app.rangkiangpedulinegeri.org/callback.php'
+        'callback_url' => 'https://mahad-ibnuzubair.ypi-khairaummah.sch.id/callback.php'
     ];
     
     $headers = [
@@ -686,7 +686,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'return_url' => 'https://ypi-khairaummah.sch.id/profile.php?tab=voucher',
                     'expired_time' => (time() + 3600),
                     'signature' => $signature,
-                    'callback_url' => 'http://kolaboraksi.app.rangkiangpedulinegeri.org/callback.php'
+                    'callback_url' => 'https://mahad-ibnuzubair.ypi-khairaummah.sch.id/callback.php'
                 ];
                 
                 $headers = [
@@ -890,6 +890,126 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                                SET status = 'gagal' 
                                                WHERE payment_id = ?");
                         $stmt->bind_param("s", $payment_id);
+                        $stmt->execute();
+                        $stmt->close();
+                        
+                        $response = [
+                            'success' => true,
+                            'status' => 'gagal',
+                            'message' => 'Pembayaran gagal'
+                        ];
+                    } else {
+                        $response = [
+                            'success' => true,
+                            'status' => 'pending',
+                            'message' => 'Status: ' . $tripay_status
+                        ];
+                    }
+            } else {
+                throw new Exception('Gagal mengecek status dari payment gateway');
+            }
+            }
+            
+        } elseif ($action === 'check_belanja_payment') {
+            $order_id = filter_var($_POST['order_id'] ?? '', FILTER_SANITIZE_STRING);
+            
+            if (empty($order_id)) {
+                throw new Exception('Order ID tidak valid');
+            }
+            
+            // Get pesanan data
+            $stmt = $conn->prepare("SELECT * FROM pesanan_belanja WHERE order_id = ? AND student_id = ?");
+            $stmt->bind_param("si", $order_id, $student_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $pesanan = $result->fetch_assoc();
+            $stmt->close();
+            
+            if (!$pesanan) {
+                throw new Exception('Pesanan tidak ditemukan');
+            }
+            
+            // Jika sudah berhasil, tidak perlu cek lagi
+            if ($pesanan['status'] === 'berhasil') {
+                $response = [
+                    'success' => true,
+                    'status' => 'berhasil',
+                    'message' => 'Pembayaran sudah berhasil! Voucher akan muncul di tab Voucher.'
+                ];
+            } else {
+                // Call Tripay API untuk cek status transaksi
+                $headers = [
+                    'Authorization: Bearer ' . TRIPAY_API_KEY,
+                    'Content-Type: application/json'
+                ];
+                
+                $tripay_ref = $pesanan['tripay_ref'];
+                $check_response = httpRequest(
+                    TRIPAY_API_URL . '/transaction/detail?reference=' . $tripay_ref, 
+                    $headers
+                );
+                
+                if ($check_response['code'] == 200 && 
+                    isset($check_response['data']['success']) &&
+                    $check_response['data']['success'] &&
+                    isset($check_response['data']['data']['status'])) {
+                    
+                    $tripay_status = $check_response['data']['data']['status'];
+                    
+                    // Map Tripay status ke status lokal
+                    if ($tripay_status === 'PAID') {
+                        // Update status di database
+                        $stmt = $conn->prepare("UPDATE pesanan_belanja SET status = 'berhasil', updated_at = NOW() WHERE order_id = ?");
+                        $stmt->bind_param("s", $order_id);
+                        $stmt->execute();
+                        $stmt->close();
+                        
+                        // Create voucher jika belum ada
+                        try {
+                            $stmt_check = $conn->prepare("SELECT id FROM voucher_pembayaran WHERE pesanan_id = ?");
+                            $stmt_check->bind_param("i", $pesanan['id']);
+                            $stmt_check->execute();
+                            $result_check = $stmt_check->get_result();
+                            $existing_voucher = $result_check->fetch_assoc();
+                            $stmt_check->close();
+                            
+                            if (!$existing_voucher) {
+                                $voucher_code = 'VCH-' . strtoupper(substr(md5($order_id . time() . rand()), 0, 10));
+                                $stmt2 = $conn->prepare("INSERT INTO voucher_pembayaran (student_id, pesanan_id, voucher_code, status) VALUES (?, ?, ?, 'pending')");
+                                $stmt2->bind_param("iis", $pesanan['student_id'], $pesanan['id'], $voucher_code);
+                                $stmt2->execute();
+                                $stmt2->close();
+                                error_log("Voucher created manually: $voucher_code for order: $order_id");
+                            }
+                        } catch (Exception $e) {
+                            error_log("Error creating voucher on manual check: " . $e->getMessage());
+                        }
+                        
+                        $response = [
+                            'success' => true,
+                            'status' => 'berhasil',
+                            'message' => 'Pembayaran berhasil! Voucher akan muncul di tab Voucher.'
+                        ];
+                    } elseif ($tripay_status === 'UNPAID') {
+                        $response = [
+                            'success' => true,
+                            'status' => 'pending',
+                            'message' => 'Pembayaran masih menunggu'
+                        ];
+                    } elseif ($tripay_status === 'EXPIRED') {
+                        $stmt = $conn->prepare("UPDATE pesanan_belanja SET status = 'expired', updated_at = NOW() WHERE order_id = ?");
+                        $stmt->bind_param("s", $order_id);
+                        $stmt->execute();
+                        $stmt->close();
+                        
+                        $response = [
+                            'success' => true,
+                            'status' => 'expired',
+                            'message' => 'Pembayaran sudah kadaluarsa'
+                        ];
+                    } elseif ($tripay_status === 'FAILED') {
+                        $stmt = $conn->prepare("UPDATE pesanan_belanja SET status = 'gagal', updated_at = NOW() WHERE order_id = ?");
+                        $stmt->bind_param("s", $order_id);
                         $stmt->execute();
                         $stmt->close();
                         
@@ -3389,6 +3509,13 @@ input, textarea, select {
                 `;
             }
             
+            // Tambahkan tombol cek status manual
+            content += `
+                <button class="btn btn-primary btn-full" onclick="checkBelanjaPaymentStatus('${payment.order_id}')" style="margin-top: 15px;">
+                    🔍 Cek Status Pembayaran Manual
+                </button>
+            `;
+            
             modalBody.innerHTML = content;
             modal.style.display = 'block';
             
@@ -3396,6 +3523,54 @@ input, textarea, select {
                 setTimeout(() => {
                     generateQRCode(payment.qr_string, 'belanja-qr-canvas');
                 }, 100);
+            }
+        }
+        
+        async function checkBelanjaPaymentStatus(orderId) {
+            if (!orderId) {
+                alert('Order ID tidak valid');
+                return;
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('action', 'check_belanja_payment');
+                formData.append('csrf_token', csrfToken);
+                formData.append('order_id', orderId);
+                
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (result.status === 'berhasil') {
+                        stopBelanjaPolling();
+                        alert('✅ ' + result.message + '\n\nHalaman akan dimuat ulang.');
+                        setTimeout(() => {
+                            window.location.href = '?tab=voucher';
+                        }, 1000);
+                    } else if (result.status === 'pending') {
+                        alert('⏳ ' + result.message + '\n\nSilakan coba lagi setelah beberapa saat.');
+                    } else if (result.status === 'expired') {
+                        stopBelanjaPolling();
+                        alert('⏰ ' + result.message);
+                        closeModal();
+                    } else if (result.status === 'gagal') {
+                        stopBelanjaPolling();
+                        alert('❌ ' + result.message);
+                        closeModal();
+                    } else {
+                        alert('ℹ️ ' + result.message);
+                    }
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error checking payment:', error);
+                alert('Terjadi kesalahan saat memeriksa status pembayaran');
             }
         }
         
