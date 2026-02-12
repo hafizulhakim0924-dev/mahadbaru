@@ -1,11 +1,32 @@
 <?php
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/keuangan_dashboard_errors.log');
+
 session_start();
 
 // Database Config
 $servername = "localhost";
-$username = "ypikhair_admin";
-$password = "hakim123123123";
-$dbname = "ypikhair_datautama";
+$username = "ypikhair_adminmahadzubair";
+$password = "Hakim123!";
+$dbname = "ypikhair_mahadzubair";
+
+// Initialize variables
+$success = '';
+$error = '';
+$keuangan_id = null;
+$keuangan_nama = null;
+$keuangan_username = null;
+$conn = null;
+
+// Handle logout
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header('Location: login_siswa.php');
+    exit;
+}
 
 // Check if keuangan is logged in - redirect to unified login if not
 if (!isset($_SESSION['keuangan_id'])) {
@@ -13,125 +34,243 @@ if (!isset($_SESSION['keuangan_id'])) {
     exit;
 }
 
-$conn = new mysqli($servername, $username, $password, $dbname);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-$conn->set_charset("utf8mb4");
+// Get session variables
+$keuangan_id = $_SESSION['keuangan_id'] ?? null;
+$keuangan_username = $_SESSION['keuangan_username'] ?? 'Unknown';
+$keuangan_nama = $_SESSION['keuangan_nama'] ?? $keuangan_username;
 
-$keuangan_id = $_SESSION['keuangan_id'];
-$keuangan_nama = $_SESSION['keuangan_nama'];
+// Connect to database
+try {
+    $conn = new mysqli($servername, $username, $password, $dbname);
+    if ($conn->connect_error) {
+        throw new Exception("Database connection failed: " . $conn->connect_error);
+    }
+    $conn->set_charset("utf8mb4");
+} catch (Exception $e) {
+    error_log("KeuanganDashboard: Database connection error: " . $e->getMessage());
+    die('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Error</title></head><body style="font-family:sans-serif;text-align:center;padding:50px;"><h2>Database Error</h2><p>' . htmlspecialchars($e->getMessage()) . '</p><p>Silakan hubungi administrator.</p></body></html>');
+}
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] == 'tambah_tagihan') {
-        $student_id = intval($_POST['student_id']);
-        $nama_tagihan = trim($_POST['nama_tagihan']);
-        $jumlah = floatval($_POST['jumlah']);
-        $keterangan = trim($_POST['keterangan'] ?? '');
-        
-        $stmt = $conn->prepare("INSERT INTO tagihan (student_id, nama_tagihan, jumlah, keterangan) VALUES (?, ?, ?, ?)");
-        $stmt->bind_param("isds", $student_id, $nama_tagihan, $jumlah, $keterangan);
-        
-        if ($stmt->execute()) {
-            $success = "Tagihan berhasil ditambahkan!";
-        } else {
-            $error = "Gagal menambahkan tagihan: " . $stmt->error;
-        }
-        $stmt->close();
-    } elseif ($_POST['action'] == 'tambah_pembayaran_manual') {
-        $student_id = intval($_POST['student_id']);
-        $nama_tagihan = trim($_POST['nama_tagihan']);
-        $jumlah = floatval($_POST['jumlah']);
-        $metode = trim($_POST['metode']);
-        $keterangan = trim($_POST['keterangan'] ?? '');
-        
-        // Insert ke tabel pembayaran
-        $stmt = $conn->prepare("INSERT INTO pembayaran (student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("isdssi", $student_id, $nama_tagihan, $jumlah, $metode, $keterangan, $keuangan_id);
-        
-        if ($stmt->execute()) {
-            // Hapus tagihan yang sudah dibayar
-            $stmt2 = $conn->prepare("DELETE FROM tagihan WHERE student_id = ? AND nama_tagihan = ?");
-            $stmt2->bind_param("is", $student_id, $nama_tagihan);
-            $stmt2->execute();
-            $stmt2->close();
+        try {
+            $student_id = intval($_POST['student_id'] ?? 0);
+            $nama_tagihan = trim($_POST['nama_tagihan'] ?? '');
+            $jumlah = floatval($_POST['jumlah'] ?? 0);
+            $keterangan = trim($_POST['keterangan'] ?? '');
             
-            $success = "Pembayaran manual berhasil dicatat!";
-        } else {
-            $error = "Gagal mencatat pembayaran: " . $stmt->error;
+            if ($student_id <= 0) {
+                throw new Exception("Pilih siswa terlebih dahulu!");
+            }
+            if (empty($nama_tagihan)) {
+                throw new Exception("Nama tagihan harus diisi!");
+            }
+            if ($jumlah <= 0) {
+                throw new Exception("Jumlah harus lebih dari 0!");
+            }
+            
+            $stmt = $conn->prepare("INSERT INTO tagihan (student_id, nama_tagihan, jumlah, keterangan) VALUES (?, ?, ?, ?)");
+            if (!$stmt) {
+                throw new Exception("Failed to prepare query: " . $conn->error);
+            }
+            
+            $stmt->bind_param("isds", $student_id, $nama_tagihan, $jumlah, $keterangan);
+            
+            if ($stmt->execute()) {
+                $success = "Tagihan berhasil ditambahkan!";
+            } else {
+                throw new Exception("Failed to execute query: " . $stmt->error);
+            }
+            $stmt->close();
+        } catch (Exception $e) {
+            $error = "Gagal menambahkan tagihan: " . $e->getMessage();
+            error_log("KeuanganDashboard: Error adding tagihan: " . $e->getMessage());
         }
-        $stmt->close();
+    } elseif ($_POST['action'] == 'tambah_pembayaran_manual') {
+        try {
+            $student_id = intval($_POST['student_id'] ?? 0);
+            $nama_tagihan = trim($_POST['nama_tagihan'] ?? '');
+            $jumlah = floatval($_POST['jumlah'] ?? 0);
+            $metode = trim($_POST['metode'] ?? 'Tunai');
+            $keterangan = trim($_POST['keterangan'] ?? '');
+            
+            if ($student_id <= 0) {
+                throw new Exception("Pilih siswa terlebih dahulu!");
+            }
+            if (empty($nama_tagihan)) {
+                throw new Exception("Nama tagihan harus diisi!");
+            }
+            if ($jumlah <= 0) {
+                throw new Exception("Jumlah harus lebih dari 0!");
+            }
+            
+            // Insert ke tabel pembayaran
+            $stmt = $conn->prepare("INSERT INTO pembayaran (student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id) VALUES (?, ?, ?, ?, ?, ?)");
+            if (!$stmt) {
+                throw new Exception("Failed to prepare pembayaran query: " . $conn->error);
+            }
+            
+            $stmt->bind_param("isdssi", $student_id, $nama_tagihan, $jumlah, $metode, $keterangan, $keuangan_id);
+            
+            if ($stmt->execute()) {
+                // Hapus tagihan yang sudah dibayar
+                $stmt2 = $conn->prepare("DELETE FROM tagihan WHERE student_id = ? AND nama_tagihan = ?");
+                if ($stmt2) {
+                    $stmt2->bind_param("is", $student_id, $nama_tagihan);
+                    $stmt2->execute();
+                    $stmt2->close();
+                }
+                
+                $success = "Pembayaran manual berhasil dicatat!";
+            } else {
+                throw new Exception("Failed to execute pembayaran query: " . $stmt->error);
+            }
+            $stmt->close();
+        } catch (Exception $e) {
+            $error = "Gagal mencatat pembayaran: " . $e->getMessage();
+            error_log("KeuanganDashboard: Error adding pembayaran: " . $e->getMessage());
+        }
     } elseif ($_POST['action'] == 'hapus_tagihan') {
-        $id = intval($_POST['id']);
-        
-        $stmt = $conn->prepare("DELETE FROM tagihan WHERE id = ?");
-        $stmt->bind_param("i", $id);
-        
-        if ($stmt->execute()) {
-            $success = "Tagihan berhasil dihapus!";
-        } else {
-            $error = "Gagal menghapus tagihan: " . $stmt->error;
+        try {
+            $id = intval($_POST['id'] ?? 0);
+            
+            if ($id <= 0) {
+                throw new Exception("ID tagihan tidak valid!");
+            }
+            
+            $stmt = $conn->prepare("DELETE FROM tagihan WHERE id = ?");
+            if (!$stmt) {
+                throw new Exception("Failed to prepare delete query: " . $conn->error);
+            }
+            
+            $stmt->bind_param("i", $id);
+            
+            if ($stmt->execute()) {
+                $success = "Tagihan berhasil dihapus!";
+            } else {
+                throw new Exception("Failed to execute delete query: " . $stmt->error);
+            }
+            $stmt->close();
+        } catch (Exception $e) {
+            $error = "Gagal menghapus tagihan: " . $e->getMessage();
+            error_log("KeuanganDashboard: Error deleting tagihan: " . $e->getMessage());
         }
-        $stmt->close();
     }
 }
 
 // Get all students
-$stmt = $conn->prepare("SELECT id, name, class FROM students ORDER BY name ASC");
-$stmt->execute();
-$result = $stmt->get_result();
 $students = [];
-while ($row = $result->fetch_assoc()) {
-    $students[] = $row;
+try {
+    $stmt = $conn->prepare("SELECT id, name, class FROM students ORDER BY name ASC");
+    if (!$stmt) {
+        throw new Exception("Failed to prepare students query: " . $conn->error);
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $students[] = $row;
+        }
+    }
+    $stmt->close();
+} catch (Exception $e) {
+    error_log("KeuanganDashboard: Error fetching students: " . $e->getMessage());
+    $error .= "Error fetching students: " . $e->getMessage() . "<br>";
 }
-$stmt->close();
 
 // Get all tagihan
-$stmt = $conn->prepare("
-    SELECT t.*, s.name as student_name, s.class 
-    FROM tagihan t
-    LEFT JOIN students s ON t.student_id = s.id
-    ORDER BY t.id DESC
-");
-$stmt->execute();
-$result = $stmt->get_result();
 $tagihan_list = [];
-while ($row = $result->fetch_assoc()) {
-    $tagihan_list[] = $row;
+try {
+    $stmt = $conn->prepare("
+        SELECT t.*, s.name as student_name, s.class 
+        FROM tagihan t
+        LEFT JOIN students s ON t.student_id = s.id
+        ORDER BY t.id DESC
+    ");
+    if (!$stmt) {
+        throw new Exception("Failed to prepare tagihan query: " . $conn->error);
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $tagihan_list[] = $row;
+        }
+    }
+    $stmt->close();
+} catch (Exception $e) {
+    error_log("KeuanganDashboard: Error fetching tagihan: " . $e->getMessage());
+    $error .= "Error fetching tagihan: " . $e->getMessage() . "<br>";
 }
-$stmt->close();
 
 // Get all pembayaran manual
-$stmt = $conn->prepare("
-    SELECT p.*, s.name as student_name, s.class 
-    FROM pembayaran p
-    LEFT JOIN students s ON p.student_id = s.id
-    ORDER BY p.tanggal DESC
-    LIMIT 50
-");
-$stmt->execute();
-$result = $stmt->get_result();
 $pembayaran_list = [];
-while ($row = $result->fetch_assoc()) {
-    $pembayaran_list[] = $row;
+try {
+    $stmt = $conn->prepare("
+        SELECT p.*, s.name as student_name, s.class 
+        FROM pembayaran p
+        LEFT JOIN students s ON p.student_id = s.id
+        ORDER BY p.tanggal DESC
+        LIMIT 50
+    ");
+    if (!$stmt) {
+        throw new Exception("Failed to prepare pembayaran query: " . $conn->error);
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $pembayaran_list[] = $row;
+        }
+    }
+    $stmt->close();
+} catch (Exception $e) {
+    error_log("KeuanganDashboard: Error fetching pembayaran: " . $e->getMessage());
+    $error .= "Error fetching pembayaran: " . $e->getMessage() . "<br>";
 }
-$stmt->close();
 
 // Get statistics
-$stmt = $conn->query("SELECT SUM(jumlah) as total_tagihan FROM tagihan");
-$total_tagihan = $stmt->fetch_assoc()['total_tagihan'] ?? 0;
-$stmt->close();
+$total_tagihan = 0;
+$pembayaran_hari_ini = 0;
+$total_siswa = 0;
 
-$stmt = $conn->query("SELECT SUM(jumlah) as total_pembayaran FROM pembayaran WHERE DATE(tanggal) = CURDATE()");
-$pembayaran_hari_ini = $stmt->fetch_assoc()['total_pembayaran'] ?? 0;
-$stmt->close();
+try {
+    $stmt = $conn->query("SELECT SUM(jumlah) as total_tagihan FROM tagihan");
+    if ($stmt) {
+        $row = $stmt->fetch_assoc();
+        $total_tagihan = $row['total_tagihan'] ?? 0;
+        $stmt->close();
+    }
+} catch (Exception $e) {
+    error_log("KeuanganDashboard: Error fetching total_tagihan: " . $e->getMessage());
+}
 
-$stmt = $conn->query("SELECT COUNT(*) as total_siswa FROM students");
-$total_siswa = $stmt->fetch_assoc()['total_siswa'] ?? 0;
-$stmt->close();
+try {
+    $stmt = $conn->query("SELECT SUM(jumlah) as total_pembayaran FROM pembayaran WHERE DATE(tanggal) = CURDATE()");
+    if ($stmt) {
+        $row = $stmt->fetch_assoc();
+        $pembayaran_hari_ini = $row['total_pembayaran'] ?? 0;
+        $stmt->close();
+    }
+} catch (Exception $e) {
+    error_log("KeuanganDashboard: Error fetching pembayaran_hari_ini: " . $e->getMessage());
+}
 
-$conn->close();
+try {
+    $stmt = $conn->query("SELECT COUNT(*) as total_siswa FROM students");
+    if ($stmt) {
+        $row = $stmt->fetch_assoc();
+        $total_siswa = $row['total_siswa'] ?? 0;
+        $stmt->close();
+    }
+} catch (Exception $e) {
+    error_log("KeuanganDashboard: Error fetching total_siswa: " . $e->getMessage());
+}
+
+if ($conn) {
+    $conn->close();
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -185,16 +324,51 @@ $conn->close();
     <div class="header">
         <a href="?logout=1" class="logout">Logout</a>
         <h1>Dashboard Keuangan</h1>
-        <p>Keuangan: <?= htmlspecialchars($keuangan_nama) ?></p>
+        <p>Keuangan: <?= htmlspecialchars($keuangan_nama ?? $keuangan_username ?? 'Unknown') ?></p>
     </div>
 
     <div class="container">
-        <?php if (isset($success)): ?>
+        <?php if (isset($success) && !empty($success)): ?>
             <div class="success"><?= htmlspecialchars($success) ?></div>
         <?php endif; ?>
-        <?php if (isset($error)): ?>
-            <div class="error"><?= htmlspecialchars($error) ?></div>
+        <?php if (isset($error) && !empty($error)): ?>
+            <div class="error"><?= $error ?></div>
         <?php endif; ?>
+        
+        <!-- Error Debug Panel -->
+        <?php if (isset($conn) && $conn && $conn->errno): ?>
+            <div class="error" style="background: #fff3cd; border: 1px solid #ffc107; color: #856404;">
+                <strong>⚠️ Database Error:</strong><br>
+                <?= htmlspecialchars($conn->error) ?><br>
+                <small>Error Code: <?= $conn->errno ?></small>
+            </div>
+        <?php endif; ?>
+        
+        <?php 
+        $php_errors = error_get_last();
+        if ($php_errors && ($php_errors['type'] === E_ERROR || $php_errors['type'] === E_PARSE || $php_errors['type'] === E_WARNING)): ?>
+            <div class="error" style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24;">
+                <strong>❌ PHP Error:</strong><br>
+                <?= htmlspecialchars($php_errors['message']) ?><br>
+                <small>File: <?= htmlspecialchars($php_errors['file']) ?> | Line: <?= $php_errors['line'] ?></small>
+            </div>
+        <?php endif; ?>
+        
+        <!-- Debug Info -->
+        <details style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-size: 12px;">
+            <summary style="cursor: pointer; font-weight: 600; color: #10b981;">🔍 Debug Information</summary>
+            <div style="margin-top: 10px; padding: 10px; background: white; border-radius: 5px;">
+                <strong>Database:</strong> <?= isset($conn) && $conn ? '✓ Connected' : '✗ Not Connected' ?><br>
+                <strong>Database Name:</strong> <?= htmlspecialchars($dbname) ?><br>
+                <?php if (isset($conn) && $conn && $conn->errno): ?>
+                    <strong>Error:</strong> <?= htmlspecialchars($conn->error) ?> (Code: <?= $conn->errno ?>)<br>
+                <?php endif; ?>
+                <strong>Session:</strong> Keuangan ID: <?= htmlspecialchars($keuangan_id ?? 'Not set') ?><br>
+                <strong>Keuangan Username:</strong> <?= htmlspecialchars($keuangan_username ?? 'Not set') ?><br>
+                <strong>Keuangan Nama:</strong> <?= htmlspecialchars($keuangan_nama ?? 'Not set') ?><br>
+                <strong>Error Log:</strong> <code><?= __DIR__ ?>/keuangan_dashboard_errors.log</code>
+            </div>
+        </details>
 
         <!-- Statistics -->
         <div class="stats-grid">
@@ -393,11 +567,4 @@ $conn->close();
     </script>
 </body>
 </html>
-<?php
-if (isset($_GET['logout'])) {
-    session_destroy();
-    header('Location: login_siswa.php');
-    exit;
-}
-?>
 
