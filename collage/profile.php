@@ -1983,13 +1983,12 @@ input, textarea, select {
             <?php elseif ($current_tab == 'belanja'): ?>
                 <?php
                 // Get available items
-                // Note: Siswa hanya melihat barang yang aktif dan stok > 0
-                // Admin melihat semua barang di adminbelanja.php untuk dikelola
+                // Menggunakan query yang sama dengan adminbelanja.php untuk konsistensi
                 $barang_list = [];
                 $belanja_error = null;
                 try {
-                    // Hanya tampilkan barang yang aktif dan stok > 0 untuk siswa
-                    $stmt = $conn->prepare("SELECT * FROM barang WHERE status = 'aktif' AND stok > 0 ORDER BY nama_barang ASC");
+                    // Query sama dengan adminbelanja.php: SELECT * FROM barang ORDER BY nama_barang ASC
+                    $stmt = $conn->prepare("SELECT * FROM barang ORDER BY nama_barang ASC");
                     
                     if (!$stmt) {
                         throw new Exception("Failed to prepare barang query: " . $conn->error);
@@ -2029,18 +2028,34 @@ input, textarea, select {
                         </div>
                     <?php else: ?>
                         <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <?php foreach ($barang_list as $barang): ?>
-                                <div class="product-list-item" onclick="addToCart(<?= $barang['id'] ?>, '<?= htmlspecialchars($barang['nama_barang'], ENT_QUOTES) ?>', <?= $barang['harga'] ?>, <?= $barang['stok'] ?>)">
+                            <?php foreach ($barang_list as $barang): 
+                                $is_available = ($barang['status'] == 'aktif' && $barang['stok'] > 0);
+                            ?>
+                                <div class="product-list-item" <?= $is_available ? 'onclick="addToCart(' . $barang['id'] . ', \'' . htmlspecialchars($barang['nama_barang'], ENT_QUOTES) . '\', ' . $barang['harga'] . ', ' . $barang['stok'] . ')"' : 'style="opacity: 0.6; cursor: not-allowed;"' ?>>
                                     <div class="product-content">
-                                        <div class="product-name"><?= htmlspecialchars($barang['nama_barang']) ?></div>
+                                        <div class="product-name">
+                                            <?= htmlspecialchars($barang['nama_barang']) ?>
+                                            <?php if ($barang['status'] != 'aktif'): ?>
+                                                <span style="background: #fecaca; color: #991b1b; padding: 2px 6px; border-radius: 4px; font-size: 9px; margin-left: 5px;">Nonaktif</span>
+                                            <?php endif; ?>
+                                        </div>
                                         <?php if (!empty($barang['deskripsi'])): ?>
                                             <div class="product-description"><?= htmlspecialchars($barang['deskripsi']) ?></div>
                                         <?php endif; ?>
-                                        <div class="product-stock">Stok: <?= $barang['stok'] ?></div>
+                                        <div class="product-stock">
+                                            Stok: <?= $barang['stok'] ?>
+                                            <?php if ($barang['stok'] <= 0): ?>
+                                                <span style="color: #dc2626; font-weight: 600;">(Habis)</span>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
                                     <div class="product-right">
                                         <div class="product-price">Rp <?= number_format($barang['harga'], 0, ',', '.') ?></div>
-                                        <span class="product-add-btn">+</span>
+                                        <?php if ($is_available): ?>
+                                            <span class="product-add-btn">+</span>
+                                        <?php else: ?>
+                                            <span class="product-add-btn" style="background: #9ca3af; cursor: not-allowed;">✕</span>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
