@@ -308,19 +308,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 // Deteksi kolom yang tersedia di tabel pembayaran
                 $hasSumber   = false;
                 $hasKeuangan = false;
-                if ($resCols = $conn->query("SHOW COLUMNS FROM pembayaran LIKE 'sumber'")) {
-                    $hasSumber = $resCols->num_rows > 0;
+                $hasJumlah   = false;
+                $hasNominal  = false;
+                
+                if ($resCols = $conn->query("SHOW COLUMNS FROM pembayaran")) {
+                    while ($col = $resCols->fetch_assoc()) {
+                        if ($col['Field'] === 'sumber') {
+                            $hasSumber = true;
+                        } elseif ($col['Field'] === 'keuangan_id') {
+                            $hasKeuangan = true;
+                        } elseif ($col['Field'] === 'jumlah') {
+                            $hasJumlah = true;
+                        } elseif ($col['Field'] === 'nominal') {
+                            $hasNominal = true;
+                        }
+                    }
                 }
-                if ($resCols2 = $conn->query("SHOW COLUMNS FROM pembayaran LIKE 'keuangan_id'")) {
-                    $hasKeuangan = $resCols2->num_rows > 0;
+                
+                // Tentukan nama kolom untuk nilai pembayaran (jumlah / nominal)
+                if ($hasJumlah) {
+                    $amountColumn = 'jumlah';
+                } elseif ($hasNominal) {
+                    $amountColumn = 'nominal';
+                } else {
+                    throw new Exception("Tabel pembayaran tidak memiliki kolom 'jumlah' atau 'nominal'");
                 }
                 
                 // Susun query INSERT sesuai kolom yang ada
                 if ($hasKeuangan && $hasSumber) {
-                    // student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id, sumber
+                    // student_id, nama_tagihan, jumlah/nominal, metode, keterangan, keuangan_id, sumber
                     $stmt = $conn->prepare("
                         INSERT INTO pembayaran 
-                        (student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id, sumber) 
+                        (student_id, nama_tagihan, $amountColumn, metode, keterangan, keuangan_id, sumber) 
                         VALUES (?, ?, ?, ?, ?, ?, 'teller')
                     ");
                     if (!$stmt) {
@@ -328,10 +347,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     }
                     $stmt->bind_param("isdssi", $student_id, $nama_tagihan_str, $total, $metode, $keterangan_full, $admin_id);
                 } elseif ($hasKeuangan && !$hasSumber) {
-                    // student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id
+                    // student_id, nama_tagihan, jumlah/nominal, metode, keterangan, keuangan_id
                     $stmt = $conn->prepare("
                         INSERT INTO pembayaran 
-                        (student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id) 
+                        (student_id, nama_tagihan, $amountColumn, metode, keterangan, keuangan_id) 
                         VALUES (?, ?, ?, ?, ?, ?)
                     ");
                     if (!$stmt) {
@@ -339,10 +358,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     }
                     $stmt->bind_param("isdssi", $student_id, $nama_tagihan_str, $total, $metode, $keterangan_full, $admin_id);
                 } elseif (!$hasKeuangan && $hasSumber) {
-                    // student_id, nama_tagihan, jumlah, metode, keterangan, sumber
+                    // student_id, nama_tagihan, jumlah/nominal, metode, keterangan, sumber
                     $stmt = $conn->prepare("
                         INSERT INTO pembayaran 
-                        (student_id, nama_tagihan, jumlah, metode, keterangan, sumber) 
+                        (student_id, nama_tagihan, $amountColumn, metode, keterangan, sumber) 
                         VALUES (?, ?, ?, ?, ?, 'teller')
                     ");
                     if (!$stmt) {
@@ -350,10 +369,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     }
                     $stmt->bind_param("isdss", $student_id, $nama_tagihan_str, $total, $metode, $keterangan_full);
                 } else {
-                    // Hanya kolom dasar: student_id, nama_tagihan, jumlah, metode, keterangan
+                    // Hanya kolom dasar: student_id, nama_tagihan, jumlah/nominal, metode, keterangan
                     $stmt = $conn->prepare("
                         INSERT INTO pembayaran 
-                        (student_id, nama_tagihan, jumlah, metode, keterangan) 
+                        (student_id, nama_tagihan, $amountColumn, metode, keterangan) 
                         VALUES (?, ?, ?, ?, ?)
                     ");
                     if (!$stmt) {
