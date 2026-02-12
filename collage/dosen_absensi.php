@@ -1,4 +1,10 @@
 <?php
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/dosen_absensi_errors.log');
+
 session_start();
 
 // Database Config
@@ -288,35 +294,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     
                     // Kolom berikutnya harus jumlah
                     $jumlah_str = isset($cols[$idx + 1]) ? trim($cols[$idx + 1]) : '';
-                    $jumlah = floatval(str_replace(['Rp', 'rp', '.', ','], '', $jumlah_str));
+                    $jumlah = intval(str_replace(['Rp', 'rp', '.', ','], '', $jumlah_str));
                     
                     if ($jumlah <= 0) {
                         $errors[] = "Siswa " . $student_info['name'] . " (ID: $student_id): Jumlah tagihan '$nama_tagihan' tidak valid";
+                        error_log("DosenAbsensi - Import Tagihan: Jumlah tidak valid untuk siswa ID $student_id, tagihan: $nama_tagihan");
                         $idx += 2;
                         continue;
                     }
                     
-                    // Keterangan opsional (kolom setelah jumlah, jika ada dan bukan angka)
-                    $keterangan = '';
-                    if (isset($cols[$idx + 2])) {
-                        $next_col = trim($cols[$idx + 2]);
-                        $next_col_clean = str_replace(['Rp', 'rp', '.', ','], '', $next_col);
-                        if (!empty($next_col) && !is_numeric($next_col_clean)) {
-                            $keterangan = $next_col;
-                            $idx += 3;
-                        } else {
-                            $idx += 2;
-                        }
-                    } else {
-                        $idx += 2;
+                    // Validasi panjang nama_tagihan (max 150 karakter sesuai struktur tabel)
+                    if (strlen($nama_tagihan) > 150) {
+                        $nama_tagihan = substr($nama_tagihan, 0, 150);
+                        error_log("DosenAbsensi - Import Tagihan: Nama tagihan dipotong untuk siswa ID $student_id");
                     }
                     
                     $tagihan_data[] = [
                         'student_id' => $student_id,
                         'nama_tagihan' => $nama_tagihan,
-                        'jumlah' => $jumlah,
-                        'keterangan' => $keterangan
+                        'jumlah' => $jumlah
                     ];
+                    
+                    $idx += 2; // Skip: nama_tagihan, jumlah
                 }
             }
             
@@ -325,20 +324,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 $conn->begin_transaction();
                 
                 try {
-                    $stmt = $conn->prepare("INSERT INTO tagihan (student_id, nama_tagihan, jumlah, keterangan) VALUES (?, ?, ?, ?)");
+                    // Sesuai struktur tabel: hanya student_id, nama_tagihan, jumlah (tanpa keterangan)
+                    $stmt = $conn->prepare("INSERT INTO tagihan (student_id, nama_tagihan, jumlah) VALUES (?, ?, ?)");
+                    
+                    if (!$stmt) {
+                        throw new Exception("Error preparing query: " . $conn->error);
+                    }
                     
                     foreach ($tagihan_data as $data) {
-                        $stmt->bind_param("isds", 
+                        $stmt->bind_param("isi", 
                             $data['student_id'],
                             $data['nama_tagihan'],
-                            $data['jumlah'],
-                            $data['keterangan']
+                            $data['jumlah']
                         );
                         
                         if ($stmt->execute()) {
                             $success_count++;
                         } else {
-                            $errors[] = "Gagal insert tagihan: " . $data['nama_tagihan'] . " untuk student ID " . $data['student_id'] . " - " . $stmt->error;
+                            $error_msg = "Gagal insert tagihan: " . $data['nama_tagihan'] . " untuk student ID " . $data['student_id'] . " - " . $stmt->error;
+                            $errors[] = $error_msg;
+                            error_log("DosenAbsensi - Import Tagihan Error: " . $error_msg);
                         }
                     }
                     
@@ -356,10 +361,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     }
                 } catch (Exception $e) {
                     $conn->rollback();
-                    $error = "Error: " . $e->getMessage();
+                    $error_msg = "Error: " . $e->getMessage();
+                    $error = $error_msg;
+                    error_log("DosenAbsensi - Import Tagihan Exception: " . $error_msg);
                 }
             } else {
                 $error = "Tidak ada data valid untuk diimport. Pastikan format tagihan benar (Nama Tagihan | Jumlah).";
+                error_log("DosenAbsensi - Import Tagihan: Tidak ada data valid");
             }
         }
     }
@@ -451,6 +459,38 @@ $stmt->close();
         <?php if (isset($error)): ?>
             <div class="error"><?= $error ?></div>
         <?php endif; ?>
+        
+        <!-- Error Debug Panel -->
+        <?php if (isset($conn) && $conn->errno): ?>
+            <div class="error" style="background: #fff3cd; border: 1px solid #ffc107; color: #856404;">
+                <strong>⚠️ Database Error:</strong><br>
+                <?= htmlspecialchars($conn->error) ?><br>
+                <small>Error Code: <?= $conn->errno ?></small>
+            </div>
+        <?php endif; ?>
+        
+        <?php 
+        $php_errors = error_get_last();
+        if ($php_errors && $php_errors['type'] === E_ERROR): ?>
+            <div class="error" style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24;">
+                <strong>❌ PHP Error:</strong><br>
+                <?= htmlspecialchars($php_errors['message']) ?><br>
+                <small>File: <?= htmlspecialchars($php_errors['file']) ?> | Line: <?= $php_errors['line'] ?></small>
+            </div>
+        <?php endif; ?>
+        
+        <!-- Debug Info -->
+        <details style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-size: 12px;">
+            <summary style="cursor: pointer; font-weight: 600; color: #667eea;">🔍 Debug Information</summary>
+            <div style="margin-top: 10px; padding: 10px; background: white; border-radius: 5px;">
+                <strong>Database:</strong> <?= isset($conn) && $conn ? '✓ Connected' : '✗ Not Connected' ?><br>
+                <?php if (isset($conn) && $conn && $conn->errno): ?>
+                    <strong>Error:</strong> <?= htmlspecialchars($conn->error) ?> (Code: <?= $conn->errno ?>)<br>
+                <?php endif; ?>
+                <strong>Session:</strong> Dosen ID: <?= isset($_SESSION['dosen_id']) ? $_SESSION['dosen_id'] : 'Not set' ?><br>
+                <strong>Error Log:</strong> <code><?= __DIR__ ?>/dosen_absensi_errors.log</code>
+            </div>
+        </details>
 
         <div class="tabs">
             <button class="tab-btn active" onclick="showTab('absensi')">Input Absensi</button>
