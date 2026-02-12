@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $_SESSION['is_superadmin'] = true;
                     $_SESSION['last_activity'] = time();
                     $conn->close();
-                    header('Location: adminbelanja.php');
+                    header('Location: admin_dashboard.php');
                     exit;
                 } elseif ($user_type == 'dosen') {
                     $_SESSION['dosen_id'] = 999;
@@ -155,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $stmt->close();
                         $conn->close();
                         
-                        header('Location: adminbelanja.php');
+                        header('Location: admin_dashboard.php');
                         exit;
                     } else {
                         $error = "Password salah!";
