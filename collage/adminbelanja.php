@@ -22,9 +22,9 @@ session_start();
 // ============================================
 $config = [
     'db_host' => 'localhost',
-    'db_user' => 'ypikhair_admin',
-    'db_pass' => 'hakim123123123',
-    'db_name' => 'ypikhair_datautama',
+    'db_user' => 'ypikhair_adminmahadzubair',
+    'db_pass' => 'Hakim123!',
+    'db_name' => 'ypikhair_mahadzubair',
     'charset' => 'utf8mb4'
 ];
 
@@ -79,10 +79,13 @@ function sanitize($data) {
 
 /**
  * Get all barang
+ * Note: Admin melihat semua barang (aktif dan nonaktif) untuk dikelola
+ * Siswa hanya melihat barang yang status='aktif' AND stok > 0 (lihat profile.php)
  */
 function getBarangList($conn) {
     $barang_list = [];
     try {
+        // Admin melihat semua barang untuk dikelola (termasuk yang nonaktif)
         $stmt = $conn->prepare("SELECT * FROM barang ORDER BY nama_barang ASC");
         if ($stmt) {
             if ($stmt->execute()) {

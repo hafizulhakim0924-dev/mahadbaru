@@ -1983,9 +1983,12 @@ input, textarea, select {
             <?php elseif ($current_tab == 'belanja'): ?>
                 <?php
                 // Get available items
+                // Note: Siswa hanya melihat barang yang aktif dan stok > 0
+                // Admin melihat semua barang di adminbelanja.php untuk dikelola
                 $barang_list = [];
                 $belanja_error = null;
                 try {
+                    // Hanya tampilkan barang yang aktif dan stok > 0 untuk siswa
                     $stmt = $conn->prepare("SELECT * FROM barang WHERE status = 'aktif' AND stok > 0 ORDER BY nama_barang ASC");
                     
                     if (!$stmt) {
