@@ -304,14 +304,62 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 // Insert ke pembayaran (manual teller)
                 $nama_tagihan_str = implode(', ', array_column($tagihan_list, 'nama_tagihan'));
                 $keterangan_full = "Bayar melalui Teller - Metode: $metode" . (!empty($keterangan) ? " - $keterangan" : "");
-                // Check if sumber column exists
-                $check_col = $conn->query("SHOW COLUMNS FROM pembayaran LIKE 'sumber'");
-                if ($check_col && $check_col->num_rows > 0) {
-                    $stmt = $conn->prepare("INSERT INTO pembayaran (student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id, sumber) VALUES (?, ?, ?, ?, ?, ?, 'teller')");
+                
+                // Deteksi kolom yang tersedia di tabel pembayaran
+                $hasSumber   = false;
+                $hasKeuangan = false;
+                if ($resCols = $conn->query("SHOW COLUMNS FROM pembayaran LIKE 'sumber'")) {
+                    $hasSumber = $resCols->num_rows > 0;
+                }
+                if ($resCols2 = $conn->query("SHOW COLUMNS FROM pembayaran LIKE 'keuangan_id'")) {
+                    $hasKeuangan = $resCols2->num_rows > 0;
+                }
+                
+                // Susun query INSERT sesuai kolom yang ada
+                if ($hasKeuangan && $hasSumber) {
+                    // student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id, sumber
+                    $stmt = $conn->prepare("
+                        INSERT INTO pembayaran 
+                        (student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id, sumber) 
+                        VALUES (?, ?, ?, ?, ?, ?, 'teller')
+                    ");
+                    if (!$stmt) {
+                        throw new Exception("Gagal mempersiapkan pembayaran (keuangan+sumber): " . $conn->error);
+                    }
                     $stmt->bind_param("isdssi", $student_id, $nama_tagihan_str, $total, $metode, $keterangan_full, $admin_id);
+                } elseif ($hasKeuangan && !$hasSumber) {
+                    // student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id
+                    $stmt = $conn->prepare("
+                        INSERT INTO pembayaran 
+                        (student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id) 
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ");
+                    if (!$stmt) {
+                        throw new Exception("Gagal mempersiapkan pembayaran (keuangan): " . $conn->error);
+                    }
+                    $stmt->bind_param("isdssi", $student_id, $nama_tagihan_str, $total, $metode, $keterangan_full, $admin_id);
+                } elseif (!$hasKeuangan && $hasSumber) {
+                    // student_id, nama_tagihan, jumlah, metode, keterangan, sumber
+                    $stmt = $conn->prepare("
+                        INSERT INTO pembayaran 
+                        (student_id, nama_tagihan, jumlah, metode, keterangan, sumber) 
+                        VALUES (?, ?, ?, ?, ?, 'teller')
+                    ");
+                    if (!$stmt) {
+                        throw new Exception("Gagal mempersiapkan pembayaran (sumber): " . $conn->error);
+                    }
+                    $stmt->bind_param("isdss", $student_id, $nama_tagihan_str, $total, $metode, $keterangan_full);
                 } else {
-                    $stmt = $conn->prepare("INSERT INTO pembayaran (student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id) VALUES (?, ?, ?, ?, ?, ?)");
-                    $stmt->bind_param("isdssi", $student_id, $nama_tagihan_str, $total, $metode, $keterangan_full, $admin_id);
+                    // Hanya kolom dasar: student_id, nama_tagihan, jumlah, metode, keterangan
+                    $stmt = $conn->prepare("
+                        INSERT INTO pembayaran 
+                        (student_id, nama_tagihan, jumlah, metode, keterangan) 
+                        VALUES (?, ?, ?, ?, ?)
+                    ");
+                    if (!$stmt) {
+                        throw new Exception("Gagal mempersiapkan pembayaran (dasar): " . $conn->error);
+                    }
+                    $stmt->bind_param("isdss", $student_id, $nama_tagihan_str, $total, $metode, $keterangan_full);
                 }
                 
                 if (!$stmt->execute()) {
