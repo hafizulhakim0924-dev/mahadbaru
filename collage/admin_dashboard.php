@@ -507,7 +507,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         try {
             $tagihan_list = [];
             
-            $stmt = $conn->prepare("SELECT id, nama_tagihan, jumlah, keterangan FROM tagihan WHERE student_id = ? ORDER BY created_at DESC");
+            // Struktur tabel tagihan: id, student_id, nama_tagihan, jumlah
+            // Tidak ada kolom keterangan, jadi SELECT hanya kolom yang ada
+            $stmt = $conn->prepare("SELECT id, nama_tagihan, jumlah FROM tagihan WHERE student_id = ? ORDER BY id DESC");
             if (!$stmt) {
                 throw new Exception("Gagal mempersiapkan query tagihan: " . $conn->error);
             }
