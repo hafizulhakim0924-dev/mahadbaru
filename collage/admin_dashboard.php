@@ -483,18 +483,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
     elseif ($action == 'get_student_tagihan' && isset($_POST['student_id'])) {
         header('Content-Type: application/json');
         $student_id = intval($_POST['student_id']);
-        $tagihan_list = [];
         
-        $stmt = $conn->prepare("SELECT id, nama_tagihan, jumlah, keterangan FROM tagihan WHERE student_id = ? ORDER BY created_at DESC");
-        $stmt->bind_param("i", $student_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $tagihan_list[] = $row;
+        try {
+            $tagihan_list = [];
+            
+            $stmt = $conn->prepare("SELECT id, nama_tagihan, jumlah, keterangan FROM tagihan WHERE student_id = ? ORDER BY created_at DESC");
+            if (!$stmt) {
+                throw new Exception("Gagal mempersiapkan query tagihan: " . $conn->error);
+            }
+            
+            $stmt->bind_param("i", $student_id);
+            if (!$stmt->execute()) {
+                throw new Exception("Gagal mengeksekusi query tagihan: " . $stmt->error);
+            }
+            
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $tagihan_list[] = $row;
+            }
+            $stmt->close();
+            
+            echo json_encode([
+                'success' => true,
+                'data' => $tagihan_list
+            ]);
+        } catch (Exception $e) {
+            $msg = "AdminDashboard - get_student_tagihan Error: " . $e->getMessage();
+            error_log($msg);
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
         }
-        $stmt->close();
-        
-        echo json_encode($tagihan_list);
         exit;
     }
 }
@@ -1537,14 +1557,21 @@ try {
             })
             .then(response => response.json())
             .then(data => {
+                if (data && data.success === false) {
+                    console.error('get_student_tagihan error:', data.error);
+                    alert('Terjadi kesalahan saat mengambil data tagihan: ' + data.error);
+                    return;
+                }
+                
+                const tagihanData = Array.isArray(data) ? data : (data.data || []);
                 const tagihanList = document.getElementById('teller-tagihan-items');
                 tagihanList.innerHTML = '';
                 
-                if (data.length === 0) {
+                if (!tagihanData || tagihanData.length === 0) {
                     tagihanList.innerHTML = '<p style="color: #666; padding: 15px;">Siswa ini tidak memiliki tagihan</p>';
                     document.getElementById('teller-tagihan-list').style.display = 'none';
                 } else {
-                    data.forEach(tagihan => {
+                    tagihanData.forEach(tagihan => {
                         const div = document.createElement('div');
                         div.style.cssText = 'padding: 15px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px;';
                         div.innerHTML = `
