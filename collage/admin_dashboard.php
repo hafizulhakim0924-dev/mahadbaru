@@ -142,10 +142,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 }
                 
                 // Create voucher
+                // Struktur tabel voucher_pembayaran: (student_id, pesanan_id, voucher_code, status)
                 $voucher_code = 'VCH-' . strtoupper(substr(md5($pesanan_id . time() . rand()), 0, 10));
-                $stmt = $conn->prepare("INSERT INTO voucher_pembayaran (student_id, pesanan_id, voucher_code, status, keterangan) VALUES (?, ?, ?, 'pending', ?)");
-                $keterangan_full = "Pembayaran Manual - Metode: $metode" . (!empty($keterangan) ? " - $keterangan" : "");
-                $stmt->bind_param("iiss", $pesanan['student_id'], $pesanan_id, $voucher_code, $keterangan_full);
+                $stmt = $conn->prepare("INSERT INTO voucher_pembayaran (student_id, pesanan_id, voucher_code, status) VALUES (?, ?, ?, 'pending')");
+                if (!$stmt) {
+                    throw new Exception("Gagal mempersiapkan voucher: " . $conn->error);
+                }
+                $stmt->bind_param("iis", $pesanan['student_id'], $pesanan_id, $voucher_code);
                 
                 if (!$stmt->execute()) {
                     throw new Exception("Gagal membuat voucher: " . $stmt->error);
@@ -432,10 +435,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 }
                 
                 // Create voucher
+                // Struktur tabel voucher_pembayaran: (student_id, pesanan_id, voucher_code, status)
                 $voucher_code = 'VCH-' . strtoupper(substr(md5($pesanan_id . time() . rand()), 0, 10));
-                $keterangan_full = "Pembayaran Manual Teller - Metode: $metode" . (!empty($keterangan) ? " - $keterangan" : "");
-                $stmt = $conn->prepare("INSERT INTO voucher_pembayaran (student_id, pesanan_id, voucher_code, status, keterangan) VALUES (?, ?, ?, 'pending', ?)");
-                $stmt->bind_param("iiss", $student_id, $pesanan_id, $voucher_code, $keterangan_full);
+                $stmt = $conn->prepare("INSERT INTO voucher_pembayaran (student_id, pesanan_id, voucher_code, status) VALUES (?, ?, ?, 'pending')");
+                if (!$stmt) {
+                    throw new Exception("Gagal mempersiapkan voucher: " . $conn->error);
+                }
+                $stmt->bind_param("iis", $student_id, $pesanan_id, $voucher_code);
                 if (!$stmt->execute()) {
                     throw new Exception("Gagal membuat voucher: " . $stmt->error);
                 }
