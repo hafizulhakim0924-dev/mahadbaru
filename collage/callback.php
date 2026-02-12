@@ -6,9 +6,9 @@ error_log('=== Tripay Callback Received ===');
 
 // Database Config (sama seperti file utama)
 $servername = "localhost";
-$username = "ypikhair_admin";
-$password = "hakim123123123";
-$dbname = "ypikhair_datautama";
+$username = "ypikhair_adminmahadzubair";
+$password = "Hakim123!";
+$dbname = "ypikhair_mahadzubair";
 
 // Tripay Config
 define('TRIPAY_PRIVATE_KEY', 'RlGRM-dPVm0-4gxYN-AakNR-pI3Li');
@@ -97,17 +97,42 @@ try {
             
             // Jika berhasil, hapus tagihan dari tabel tagihan
             if ($new_status === 'berhasil') {
-                $tagihan_detail = json_decode($payment['tagihan_detail'], true);
+                $tagihan_detail = json_decode($payment['tagihan_detail'] ?? '{}', true);
                 
-                if (is_array($tagihan_detail)) {
+                if (is_array($tagihan_detail) && !empty($tagihan_detail)) {
                     foreach ($tagihan_detail as $nama_tagihan => $jumlah) {
-                        // Hapus atau set jumlah = 0
+                        // Hapus tagihan yang sudah dibayar
                         $stmt2 = $conn->prepare("DELETE FROM tagihan WHERE student_id = ? AND nama_tagihan = ?");
-                        $stmt2->bind_param("is", $payment['student_id'], $nama_tagihan);
-                        $stmt2->execute();
-                        $stmt2->close();
-                        
-                        error_log("Deleted bill: $nama_tagihan for student {$payment['student_id']}");
+                        if ($stmt2) {
+                            $stmt2->bind_param("is", $payment['student_id'], $nama_tagihan);
+                            if ($stmt2->execute()) {
+                                error_log("Deleted bill: $nama_tagihan for student {$payment['student_id']}");
+                            } else {
+                                error_log("Failed to delete bill: $nama_tagihan - " . $stmt2->error);
+                            }
+                            $stmt2->close();
+                        } else {
+                            error_log("Failed to prepare delete bill query: " . $conn->error);
+                        }
+                    }
+                } else {
+                    // Jika tagihan_detail kosong, coba hapus berdasarkan tagihan string
+                    $tagihan_str = $payment['tagihan'] ?? '';
+                    if (!empty($tagihan_str)) {
+                        $tagihan_list = explode(', ', $tagihan_str);
+                        foreach ($tagihan_list as $nama_tagihan) {
+                            $nama_tagihan = trim($nama_tagihan);
+                            if (!empty($nama_tagihan)) {
+                                $stmt2 = $conn->prepare("DELETE FROM tagihan WHERE student_id = ? AND nama_tagihan = ?");
+                                if ($stmt2) {
+                                    $stmt2->bind_param("is", $payment['student_id'], $nama_tagihan);
+                                    if ($stmt2->execute()) {
+                                        error_log("Deleted bill: $nama_tagihan for student {$payment['student_id']}");
+                                    }
+                                    $stmt2->close();
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -144,30 +169,44 @@ try {
                 
                 // Jika berhasil, create voucher (jika belum ada)
                 if ($new_status === 'berhasil') {
-                    // Cek apakah voucher sudah ada
-                    $stmt_check = $conn->prepare("SELECT id FROM voucher_pembayaran WHERE pesanan_id = ?");
-                    $stmt_check->bind_param("i", $pesanan['id']);
-                    $stmt_check->execute();
-                    $result_check = $stmt_check->get_result();
-                    $existing_voucher = $result_check->fetch_assoc();
-                    $stmt_check->close();
-                    
-                    if (!$existing_voucher) {
-                        // Generate voucher code
-                        $voucher_code = 'VCH-' . strtoupper(substr(md5($order_id . time() . rand()), 0, 10));
-                        
-                        // Create voucher
-                        $stmt2 = $conn->prepare("
-                            INSERT INTO voucher_pembayaran (student_id, pesanan_id, voucher_code, status) 
-                            VALUES (?, ?, ?, 'pending')
-                        ");
-                        $stmt2->bind_param("iis", $pesanan['student_id'], $pesanan['id'], $voucher_code);
-                        $stmt2->execute();
-                        $stmt2->close();
-                        
-                        error_log("Voucher created: $voucher_code for student {$pesanan['student_id']}, order: $order_id");
-                    } else {
-                        error_log("Voucher already exists for order: $order_id");
+                    try {
+                        // Cek apakah voucher sudah ada
+                        $stmt_check = $conn->prepare("SELECT id FROM voucher_pembayaran WHERE pesanan_id = ?");
+                        if ($stmt_check) {
+                            $stmt_check->bind_param("i", $pesanan['id']);
+                            $stmt_check->execute();
+                            $result_check = $stmt_check->get_result();
+                            $existing_voucher = $result_check->fetch_assoc();
+                            $stmt_check->close();
+                            
+                            if (!$existing_voucher) {
+                                // Generate voucher code
+                                $voucher_code = 'VCH-' . strtoupper(substr(md5($order_id . time() . rand()), 0, 10));
+                                
+                                // Create voucher
+                                $stmt2 = $conn->prepare("
+                                    INSERT INTO voucher_pembayaran (student_id, pesanan_id, voucher_code, status) 
+                                    VALUES (?, ?, ?, 'pending')
+                                ");
+                                if ($stmt2) {
+                                    $stmt2->bind_param("iis", $pesanan['student_id'], $pesanan['id'], $voucher_code);
+                                    if ($stmt2->execute()) {
+                                        error_log("Voucher created: $voucher_code for student {$pesanan['student_id']}, order: $order_id, pesanan_id: {$pesanan['id']}");
+                                    } else {
+                                        error_log("Failed to create voucher: " . $stmt2->error);
+                                    }
+                                    $stmt2->close();
+                                } else {
+                                    error_log("Failed to prepare voucher insert query: " . $conn->error);
+                                }
+                            } else {
+                                error_log("Voucher already exists for order: $order_id, pesanan_id: {$pesanan['id']}");
+                            }
+                        } else {
+                            error_log("Failed to prepare voucher check query: " . $conn->error);
+                        }
+                    } catch (Exception $e) {
+                        error_log("Error creating voucher: " . $e->getMessage());
                     }
                 }
                 

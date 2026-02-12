@@ -3,9 +3,9 @@ session_start();
 
 // Database Config
 $servername = "localhost";
-$username = "ypikhair_admin";
-$password = "hakim123123123";
-$dbname = "ypikhair_datautama";
+$username = "ypikhair_adminmahadzubair";
+$password = "Hakim123!";
+$dbname = "ypikhair_mahadzubair";
 
 // Tripay Config
 define('TRIPAY_API_KEY', 'ytprKupP1zxpZg6XeFBkpe6oJjrT7jaae1zROemR');
