@@ -1152,10 +1152,10 @@ input, textarea, select {
 }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; color: #333; line-height: 1.6; }
         .container { max-width: 420px; margin: 0 auto; background: white; min-height: 100vh; }
-        .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px; text-align: center; position: relative; }
-        .header h1 { font-size: 24px; margin-bottom: 5px; }
-        .header p { opacity: 0.9; font-size: 14px; }
-        .logout { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; padding: 8px 12px; text-decoration: none; border-radius: 20px; font-size: 12px; backdrop-filter: blur(10px); }
+        .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px 16px; text-align: center; position: relative; }
+        .header h1 { font-size: 16px; margin-bottom: 3px; }
+        .header p { opacity: 0.9; font-size: 11px; }
+        .logout { position: absolute; top: 12px; right: 16px; background: rgba(255,255,255,0.2); color: white; padding: 6px 10px; text-decoration: none; border-radius: 16px; font-size: 10px; backdrop-filter: blur(10px); }
         .tabs { display: flex; background: white; border-bottom: 1px solid #e9ecef; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
         .tabs::-webkit-scrollbar { height: 4px; }
         .tabs::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 2px; }
@@ -1171,7 +1171,7 @@ input, textarea, select {
         @media (max-width: 480px) {
             .tabs a { min-width: 45px; padding: 10px 5px; font-size: 10px; }
         }
-        .content { padding: 20px; }
+        .content { padding: 12px; }
         .content-with-bottom-nav { padding-bottom: 90px !important; }
         .product-list-item {
             background: #ffffff;
@@ -1262,19 +1262,19 @@ input, textarea, select {
             transform: scale(1.05);
             box-shadow: 0 3px 8px rgba(16, 185, 129, 0.3);
         }
-        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .bill-item { border: 2px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 10px; cursor: pointer; transition: all 0.3s; }
-        .bill-item:hover { border-color: #10b981; }
+        .card { background: white; border-radius: 8px; padding: 12px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .bill-item { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; margin-bottom: 6px; cursor: pointer; transition: all 0.2s; }
+        .bill-item:hover { border-color: #10b981; background: #f0fdf4; }
         .bill-item.selected { border-color: #10b981; background: #f0fdf4; }
-        .bill-item input[type="checkbox"] { margin-right: 10px; transform: scale(1.2); }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
-        .form-group select { width: 100%; padding: 12px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 16px; background: white; }
-        .btn { width: auto; min-width: 44px; height: 44px; padding: 10px 16px; border: none; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; transition: all 0.3s; gap: 6px; }
+        .bill-item input[type="checkbox"] { margin-right: 6px; transform: scale(1.1); }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 4px; font-weight: 600; color: #333; font-size: 10px; }
+        .form-group select { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 10px; background: white; }
+        .btn { width: auto; min-width: 36px; height: 36px; padding: 6px 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 10px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; transition: all 0.3s; gap: 4px; }
         .btn-primary { background: linear-gradient(135deg, #10b981 0%, #34d399 100%); color: white; }
         .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4); }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-small { min-width: 36px; height: 36px; padding: 6px 12px; font-size: 12px; margin: 4px; display: inline-flex; }
+        .btn-small { min-width: 28px; height: 28px; padding: 4px 8px; font-size: 9px; margin: 2px; display: inline-flex; }
         .btn-full { width: 100%; }
         .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; }
         .btn-danger:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4); }
@@ -1627,15 +1627,6 @@ input, textarea, select {
             </nav>
         <?php else: ?>
             <div class="content content-with-bottom-nav">
-            <?php if ($current_tab != 'belanja'): ?>
-            <div class="tabs">
-                <a href="?" title="Menu Utama">🏠 <span class="tab-text">Menu</span></a>
-                <a href="?tab=bayar" class="<?= $current_tab == 'bayar' ? 'active' : '' ?>" title="Bayar Tagihan">💳 <span class="tab-text">Bayar</span></a>
-                <a href="?tab=absensi" class="<?= $current_tab == 'absensi' ? 'active' : '' ?>" title="Rekap Absensi">✅ <span class="tab-text">Absensi</span></a>
-                <a href="?tab=belanja" class="<?= $current_tab == 'belanja' ? 'active' : '' ?>" title="Belanja Barang">🛒 <span class="tab-text">Belanja</span></a>
-                <a href="?tab=voucher" class="<?= $current_tab == 'voucher' ? 'active' : '' ?>" title="Voucher Pembayaran">🎫 <span class="tab-text">Voucher</span></a>
-            </div>
-            <?php endif; ?>
 
             <div class="content">
                 <?php if ($current_tab == 'bayar'): ?>
@@ -1652,36 +1643,54 @@ input, textarea, select {
                 
                 <!-- Section 1: Bayar Tagihan -->
                 <?php if (!empty($unpaid_bills)): ?>
-                    <div class="card" style="margin-bottom: 16px;">
-                        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1a1a1a;">💳 Bayar Tagihan</h3>
+                    <div style="margin-bottom: 12px;">
+                        <h3 style="font-size: 11px; font-weight: 600; margin-bottom: 8px; color: #1a1a1a; text-transform: uppercase; letter-spacing: 0.5px;">💳 Bayar Tagihan</h3>
                         <form id="payment-form">
                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
                             
-                            <?php foreach ($unpaid_bills as $bill => $amount): 
-                                $tanggal_ditambahkan = null;
-                                $stmt = $conn->prepare("SELECT created_at FROM tagihan_history WHERE student_id = ? AND nama_tagihan = ? ORDER BY created_at ASC LIMIT 1");
-                                if ($stmt) {
-                                    $stmt->bind_param("is", $student_id, $bill);
-                                    if ($stmt->execute()) {
-                                        $result = $stmt->get_result();
-                                        $history_row = $result->fetch_assoc();
-                                        $tanggal_ditambahkan = $history_row ? date('d/m/Y H:i', strtotime($history_row['created_at'])) : null;
-                                    }
-                                    $stmt->close();
-                                }
-                            ?>
-                                <div class="bill-item" onclick="toggleBill('<?= htmlspecialchars($bill) ?>')">
-                                    <label style="cursor: pointer; display: block;">
-                                        <input type="checkbox" name="tagihan[]" value="<?= htmlspecialchars($bill) ?>" onchange="updateTotal()">
-                                        <strong><?= htmlspecialchars($bill) ?></strong>
-                                        <br><small>Jumlah: Rp <?= number_format($amount, 0, ',', '.') ?></small>
-                                    </label>
-                                </div>
-                            <?php endforeach; ?>
+                            <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 10px;">
+                                <thead>
+                                    <tr style="background: #f8f9fa; border-bottom: 1px solid #e5e7eb;">
+                                        <th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #6b7280; font-size: 9px; width: 30px;">✓</th>
+                                        <th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #6b7280; font-size: 9px;">Nama Tagihan</th>
+                                        <th style="padding: 6px 8px; text-align: right; font-weight: 600; color: #6b7280; font-size: 9px;">Jumlah</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($unpaid_bills as $bill => $amount): 
+                                        $tanggal_ditambahkan = null;
+                                        $stmt = $conn->prepare("SELECT created_at FROM tagihan_history WHERE student_id = ? AND nama_tagihan = ? ORDER BY created_at ASC LIMIT 1");
+                                        if ($stmt) {
+                                            $stmt->bind_param("is", $student_id, $bill);
+                                            if ($stmt->execute()) {
+                                                $result = $stmt->get_result();
+                                                $history_row = $result->fetch_assoc();
+                                                $tanggal_ditambahkan = $history_row ? date('d/m/Y H:i', strtotime($history_row['created_at'])) : null;
+                                            }
+                                            $stmt->close();
+                                        }
+                                    ?>
+                                        <tr style="border-bottom: 1px solid #f3f4f6;" onclick="toggleBill('<?= htmlspecialchars($bill) ?>')">
+                                            <td style="padding: 8px;">
+                                                <input type="checkbox" name="tagihan[]" value="<?= htmlspecialchars($bill) ?>" onchange="updateTotal()" style="width: 14px; height: 14px; cursor: pointer;">
+                                            </td>
+                                            <td style="padding: 8px; font-size: 10px; color: #1a1a1a;">
+                                                <div style="font-weight: 500;"><?= htmlspecialchars($bill) ?></div>
+                                                <?php if ($tanggal_ditambahkan): ?>
+                                                    <div style="font-size: 8px; color: #9ca3af; margin-top: 2px;"><?= $tanggal_ditambahkan ?></div>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td style="padding: 8px; text-align: right; font-size: 10px; font-weight: 600; color: #1a1a1a;">
+                                                Rp <?= number_format($amount, 0, ',', '.') ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
                             
-                            <div class="form-group">
-                                <label>Metode Pembayaran:</label>
-                                <select name="method" required>
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label style="font-size: 10px; font-weight: 600; color: #374151; margin-bottom: 4px; display: block;">Metode Pembayaran:</label>
+                                <select name="method" required style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 10px; background: white;">
                                     <option value="">Pilih Metode</option>
                                     <?php foreach ($available_methods as $method): ?>
                                         <option value="<?= $method['code'] ?>"><?= $method['name'] ?></option>
@@ -1689,87 +1698,121 @@ input, textarea, select {
                                 </select>
                             </div>
                             
-                            <div id="total-box" class="total-box" style="display:none;">
-                                <h3>Total: <span id="total-amount">Rp 0</span></h3>
+                            <div id="total-box" class="total-box" style="display:none; background: #f0fdf4; border: 1px solid #10b981; border-radius: 6px; padding: 8px; margin-bottom: 10px;">
+                                <div style="font-size: 10px; font-weight: 600; color: #065f46;">
+                                    Total: <span id="total-amount" style="color: #10b981;">Rp 0</span>
+                                </div>
                             </div>
                             
-                            <button type="submit" class="btn btn-primary btn-full" id="pay-btn" disabled>Bayar Sekarang</button>
+                            <button type="submit" class="btn btn-primary btn-full" id="pay-btn" disabled style="font-size: 10px; padding: 8px 16px; height: auto;">Bayar Sekarang</button>
                         </form>
                     </div>
                 <?php endif; ?>
                 
                 <!-- Section 2: Status Pembayaran Menunggu -->
                 <?php if (!empty($pending_payments)): ?>
-                    <div class="card" style="margin-bottom: 16px;">
-                        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1a1a1a;">⏳ Status Pembayaran</h3>
-                        <?php foreach ($pending_payments as $payment): ?>
-                            <div class="payment-item" style="margin-bottom: 12px; padding: 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;">
-                                <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #92400e;">Pembayaran Menunggu</div>
-                                <div style="font-size: 13px; margin-bottom: 4px;"><strong>Tagihan:</strong> <?= htmlspecialchars($payment['tagihan']) ?></div>
-                                <div style="font-size: 13px; margin-bottom: 4px;"><strong>Jumlah:</strong> Rp <?= number_format($payment['nominal'], 0, ',', '.') ?></div>
-                                <div style="font-size: 13px; margin-bottom: 4px;"><strong>Metode:</strong> <?= htmlspecialchars($payment['method_name']) ?></div>
-                                <div style="font-size: 13px; margin-bottom: 12px;"><strong>Berakhir:</strong> <?= date('d/m/Y H:i', strtotime($payment['expired_at'])) ?></div>
-                                <button class="btn btn-primary btn-small" onclick="showPaymentDetails('<?= $payment['payment_id'] ?>')">Lihat Detail</button>
-                            </div>
-                        <?php endforeach; ?>
+                    <div style="margin-bottom: 12px;">
+                        <h3 style="font-size: 11px; font-weight: 600; margin-bottom: 8px; color: #1a1a1a; text-transform: uppercase; letter-spacing: 0.5px;">⏳ Status Pembayaran</h3>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                            <thead>
+                                <tr style="background: #fffbeb; border-bottom: 1px solid #fde68a;">
+                                    <th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #92400e; font-size: 9px;">Tagihan</th>
+                                    <th style="padding: 6px 8px; text-align: right; font-weight: 600; color: #92400e; font-size: 9px;">Jumlah</th>
+                                    <th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #92400e; font-size: 9px;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($pending_payments as $payment): ?>
+                                    <tr style="border-bottom: 1px solid #fef3c7; background: #fffbeb;">
+                                        <td style="padding: 8px;">
+                                            <div style="font-size: 10px; font-weight: 500; color: #1a1a1a; margin-bottom: 2px;"><?= htmlspecialchars($payment['tagihan']) ?></div>
+                                            <div style="font-size: 8px; color: #9ca3af;"><?= htmlspecialchars($payment['method_name']) ?></div>
+                                            <div style="font-size: 8px; color: #f59e0b; margin-top: 2px;">Berakhir: <?= date('d/m/Y H:i', strtotime($payment['expired_at'])) ?></div>
+                                        </td>
+                                        <td style="padding: 8px; text-align: right; font-size: 10px; font-weight: 600; color: #1a1a1a;">
+                                            Rp <?= number_format($payment['nominal'], 0, ',', '.') ?>
+                                        </td>
+                                        <td style="padding: 8px; text-align: center;">
+                                            <button class="btn btn-primary btn-small" onclick="showPaymentDetails('<?= $payment['payment_id'] ?>')" style="font-size: 9px; padding: 4px 8px; height: auto;">Lihat</button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
                 <?php endif; ?>
                 
                 <!-- Section 3: Riwayat Tagihan -->
                 <?php if (!empty($tagihan_history)): ?>
-                    <div class="card" style="margin-bottom: 16px;">
-                        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1a1a1a;">📋 Riwayat Tagihan</h3>
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
-                            <?php foreach ($tagihan_history as $history): ?>
-                                <?php 
-                                $action_type = $history['action_type'] ?? 'updated';
-                                $action_labels = [
-                                    'added' => 'Ditambahkan', 'updated' => 'Diperbarui', 'reduced' => 'Dikurangi',
-                                    'removed' => 'Dihapus', 'created' => 'Dibuat', 'modified' => 'Dimodifikasi'
-                                ];
-                                $action_label = $action_labels[$action_type] ?? ucfirst($action_type);
-                                $action_class = in_array($action_type, ['created', 'added']) ? 'added' : (in_array($action_type, ['modified', 'updated']) ? 'updated' : $action_type);
-                                ?>
-                                <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                                        <div style="font-size: 14px; font-weight: 600; color: #1a1a1a;"><?= htmlspecialchars($history['nama_tagihan']) ?></div>
-                                        <span class="history-action-badge action-<?= $action_class ?>" style="font-size: 11px; padding: 3px 8px; border-radius: 12px;">
-                                            <?= $action_label ?>
-                                        </span>
-                                    </div>
-                                    <div style="font-size: 13px; color: #6b7280; margin-bottom: 4px;">
-                                        Rp <?= number_format($history['jumlah'], 0, ',', '.') ?>
-                                    </div>
-                                    <div style="font-size: 11px; color: #9ca3af;">
-                                        <?= date('d/m/Y H:i', strtotime($history['created_at'])) ?>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
+                    <div style="margin-bottom: 12px;">
+                        <h3 style="font-size: 11px; font-weight: 600; margin-bottom: 8px; color: #1a1a1a; text-transform: uppercase; letter-spacing: 0.5px;">📋 Riwayat Tagihan</h3>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                            <thead>
+                                <tr style="background: #f8f9fa; border-bottom: 1px solid #e5e7eb;">
+                                    <th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #6b7280; font-size: 9px;">Nama Tagihan</th>
+                                    <th style="padding: 6px 8px; text-align: right; font-weight: 600; color: #6b7280; font-size: 9px;">Jumlah</th>
+                                    <th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #6b7280; font-size: 9px;">Status</th>
+                                    <th style="padding: 6px 8px; text-align: right; font-weight: 600; color: #6b7280; font-size: 9px;">Tanggal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($tagihan_history as $history): ?>
+                                    <?php 
+                                    $action_type = $history['action_type'] ?? 'updated';
+                                    $action_labels = [
+                                        'added' => 'Ditambahkan', 'updated' => 'Diperbarui', 'reduced' => 'Dikurangi',
+                                        'removed' => 'Dihapus', 'created' => 'Dibuat', 'modified' => 'Dimodifikasi'
+                                    ];
+                                    $action_label = $action_labels[$action_type] ?? ucfirst($action_type);
+                                    $action_class = in_array($action_type, ['created', 'added']) ? 'added' : (in_array($action_type, ['modified', 'updated']) ? 'updated' : $action_type);
+                                    ?>
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 6px 8px; font-size: 10px; color: #1a1a1a; font-weight: 500;">
+                                            <?= htmlspecialchars($history['nama_tagihan']) ?>
+                                        </td>
+                                        <td style="padding: 6px 8px; text-align: right; font-size: 10px; color: #1a1a1a; font-weight: 500;">
+                                            Rp <?= number_format($history['jumlah'], 0, ',', '.') ?>
+                                        </td>
+                                        <td style="padding: 6px 8px; text-align: center;">
+                                            <span class="history-action-badge action-<?= $action_class ?>" style="font-size: 8px; padding: 2px 6px; border-radius: 10px; display: inline-block;">
+                                                <?= $action_label ?>
+                                            </span>
+                                        </td>
+                                        <td style="padding: 6px 8px; text-align: right; font-size: 9px; color: #9ca3af;">
+                                            <?= date('d/m/Y H:i', strtotime($history['created_at'])) ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
                 <?php endif; ?>
                 
                 <!-- Section 4: Riwayat Pembayaran -->
                 <?php if (!empty($my_payments)): ?>
-                    <div class="card" style="margin-bottom: 16px;">
-                        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1a1a1a;">📜 Riwayat Pembayaran</h3>
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
-                            <?php foreach ($my_payments as $payment): ?>
-                                <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                                        <div style="flex: 1;">
-                                            <div style="font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">
-                                                <?= htmlspecialchars($payment['tagihan']) ?>
-                                            </div>
-                                            <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">
-                                                <?= date('d/m/Y', strtotime($payment['waktu_input'])) ?>
-                                            </div>
-                                            <div style="font-size: 13px; font-weight: 600; color: #1a1a1a;">
-                                                Rp <?= number_format($payment['nominal'], 0, ',', '.') ?>
-                                            </div>
-                                        </div>
-                                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
-                                            <span class="status-<?= $payment['status'] ?>" style="font-size: 11px; padding: 4px 10px; border-radius: 12px;">
+                    <div style="margin-bottom: 12px;">
+                        <h3 style="font-size: 11px; font-weight: 600; margin-bottom: 8px; color: #1a1a1a; text-transform: uppercase; letter-spacing: 0.5px;">📜 Riwayat Pembayaran</h3>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                            <thead>
+                                <tr style="background: #f8f9fa; border-bottom: 1px solid #e5e7eb;">
+                                    <th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #6b7280; font-size: 9px;">Tagihan</th>
+                                    <th style="padding: 6px 8px; text-align: right; font-weight: 600; color: #6b7280; font-size: 9px;">Jumlah</th>
+                                    <th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #6b7280; font-size: 9px;">Status</th>
+                                    <th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #6b7280; font-size: 9px;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($my_payments as $payment): ?>
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 8px;">
+                                            <div style="font-size: 10px; font-weight: 500; color: #1a1a1a; margin-bottom: 2px;"><?= htmlspecialchars($payment['tagihan']) ?></div>
+                                            <div style="font-size: 8px; color: #9ca3af;"><?= date('d/m/Y', strtotime($payment['waktu_input'])) ?></div>
+                                        </td>
+                                        <td style="padding: 8px; text-align: right; font-size: 10px; font-weight: 600; color: #1a1a1a;">
+                                            Rp <?= number_format($payment['nominal'], 0, ',', '.') ?>
+                                        </td>
+                                        <td style="padding: 8px; text-align: center;">
+                                            <span class="status-<?= $payment['status'] ?>" style="font-size: 8px; padding: 2px 6px; border-radius: 10px; display: inline-block;">
                                                 <?php 
                                                 switch($payment['status']) {
                                                     case 'berhasil': echo 'LUNAS'; break;
@@ -1778,16 +1821,20 @@ input, textarea, select {
                                                 }
                                                 ?>
                                             </span>
+                                        </td>
+                                        <td style="padding: 8px; text-align: center;">
                                             <?php if ($payment['status'] == 'berhasil'): ?>
-                                                <button onclick="showReceipt('<?= htmlspecialchars($payment['payment_id']) ?>')" class="btn btn-primary btn-small" style="font-size: 11px; padding: 4px 10px;">Cetak</button>
+                                                <button onclick="showReceipt('<?= htmlspecialchars($payment['payment_id']) ?>')" class="btn btn-primary btn-small" style="font-size: 9px; padding: 4px 8px; height: auto;">Cetak</button>
                                             <?php elseif ($payment['status'] == 'pending' && $payment['source'] == 'tripay'): ?>
-                                                <button onclick="showPaymentDetails('<?= htmlspecialchars($payment['payment_id']) ?>')" class="btn btn-primary btn-small" style="font-size: 11px; padding: 4px 10px;">Lihat</button>
+                                                <button onclick="showPaymentDetails('<?= htmlspecialchars($payment['payment_id']) ?>')" class="btn btn-primary btn-small" style="font-size: 9px; padding: 4px 8px; height: auto;">Lihat</button>
+                                            <?php else: ?>
+                                                <span style="font-size: 8px; color: #9ca3af;">-</span>
                                             <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
                 <?php endif; ?>
                 
