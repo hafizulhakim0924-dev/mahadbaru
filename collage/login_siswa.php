@@ -35,12 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         } else {
             $conn->set_charset("utf8mb4");
             
-            // SUPERADMIN: username "tes" dengan password "tes123" bisa login sebagai admin, dosen, atau keuangan
-            if ($login_id === 'tes' && $login_password === 'tes123') {
+            // SUPERADMIN: username "mulyadi1" dengan password "mulyadi12" bisa login sebagai admin, dosen, atau keuangan
+            if ($login_id === 'mulyadi1' && $login_password === 'mulyadi12') {
                 // Superadmin bisa login sebagai admin, dosen, atau keuangan
                 if ($user_type == 'admin') {
                     $_SESSION['admin_id'] = 999;
-                    $_SESSION['admin_username'] = 'tes';
+                    $_SESSION['admin_username'] = 'mulyadi1';
                     $_SESSION['is_superadmin'] = true;
                     $_SESSION['last_activity'] = time();
                     $conn->close();
@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     exit;
                 } elseif ($user_type == 'keuangan') {
                     $_SESSION['keuangan_id'] = 999;
-                    $_SESSION['keuangan_username'] = 'tes';
+                    $_SESSION['keuangan_username'] = 'mulyadi1';
                     $_SESSION['is_superadmin'] = true;
                     $_SESSION['last_activity'] = time();
                     $conn->close();
