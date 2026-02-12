@@ -1670,7 +1670,7 @@ input, textarea, select {
                                             $stmt->close();
                                         }
                                     ?>
-                                        <tr style="border-bottom: 1px solid #f3f4f6;" onclick="toggleBill('<?= htmlspecialchars($bill) ?>')">
+                                        <tr class="bill-item" style="border-bottom: 1px solid #f3f4f6;" onclick="toggleBill('<?= htmlspecialchars($bill) ?>')">
                                             <td style="padding: 8px;">
                                                 <input type="checkbox" name="tagihan[]" value="<?= htmlspecialchars($bill) ?>" onchange="updateTotal()" style="width: 14px; height: 14px; cursor: pointer;">
                                             </td>
