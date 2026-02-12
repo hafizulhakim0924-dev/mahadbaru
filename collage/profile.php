@@ -801,7 +801,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 error_log('Belanja payment creation failed for student ' . $student_id . ': ' . $e->getMessage());
                 throw $e;
             }
-            
+
         } elseif ($action === 'check_payment') {
             $payment_id = filter_var($_POST['payment_id'] ?? '', FILTER_SANITIZE_STRING);
             
@@ -1978,19 +1978,19 @@ input, textarea, select {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($unpaid_bills as $bill => $amount): 
-                                        $tanggal_ditambahkan = null;
-                                        $stmt = $conn->prepare("SELECT created_at FROM tagihan_history WHERE student_id = ? AND nama_tagihan = ? ORDER BY created_at ASC LIMIT 1");
-                                        if ($stmt) {
-                                            $stmt->bind_param("is", $student_id, $bill);
-                                            if ($stmt->execute()) {
-                                                $result = $stmt->get_result();
-                                                $history_row = $result->fetch_assoc();
-                                                $tanggal_ditambahkan = $history_row ? date('d/m/Y H:i', strtotime($history_row['created_at'])) : null;
-                                            }
-                                            $stmt->close();
-                                        }
-                                    ?>
+                            <?php foreach ($unpaid_bills as $bill => $amount): 
+                                $tanggal_ditambahkan = null;
+                                $stmt = $conn->prepare("SELECT created_at FROM tagihan_history WHERE student_id = ? AND nama_tagihan = ? ORDER BY created_at ASC LIMIT 1");
+                                if ($stmt) {
+                                    $stmt->bind_param("is", $student_id, $bill);
+                                    if ($stmt->execute()) {
+                                        $result = $stmt->get_result();
+                                        $history_row = $result->fetch_assoc();
+                                        $tanggal_ditambahkan = $history_row ? date('d/m/Y H:i', strtotime($history_row['created_at'])) : null;
+                                    }
+                                    $stmt->close();
+                                }
+                            ?>
                                         <tr class="bill-item" style="border-bottom: 1px solid #f3f4f6;" onclick="toggleBill('<?= htmlspecialchars($bill) ?>')">
                                             <td style="padding: 8px;">
                                                 <input type="checkbox" name="tagihan[]" value="<?= htmlspecialchars($bill) ?>" onchange="updateTotal()" style="width: 14px; height: 14px; cursor: pointer;">
@@ -2005,7 +2005,7 @@ input, textarea, select {
                                                 Rp <?= number_format($amount, 0, ',', '.') ?>
                                             </td>
                                         </tr>
-                                    <?php endforeach; ?>
+                            <?php endforeach; ?>
                                 </tbody>
                             </table>
                             
@@ -2043,7 +2043,7 @@ input, textarea, select {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($pending_payments as $payment): ?>
+                        <?php foreach ($pending_payments as $payment): ?>
                                     <tr style="border-bottom: 1px solid #fef3c7; background: #fffbeb;">
                                         <td style="padding: 8px;">
                                             <div style="font-size: 10px; font-weight: 500; color: #1a1a1a; margin-bottom: 2px;"><?= htmlspecialchars($payment['tagihan']) ?></div>
@@ -2057,7 +2057,7 @@ input, textarea, select {
                                             <button class="btn btn-primary btn-small" onclick="showPaymentDetails('<?= $payment['payment_id'] ?>')" style="font-size: 9px; padding: 4px 8px; height: auto;">Lihat</button>
                                         </td>
                                     </tr>
-                                <?php endforeach; ?>
+                        <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
@@ -2077,16 +2077,16 @@ input, textarea, select {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($tagihan_history as $history): ?>
-                                    <?php 
-                                    $action_type = $history['action_type'] ?? 'updated';
-                                    $action_labels = [
-                                        'added' => 'Ditambahkan', 'updated' => 'Diperbarui', 'reduced' => 'Dikurangi',
-                                        'removed' => 'Dihapus', 'created' => 'Dibuat', 'modified' => 'Dimodifikasi'
-                                    ];
-                                    $action_label = $action_labels[$action_type] ?? ucfirst($action_type);
-                                    $action_class = in_array($action_type, ['created', 'added']) ? 'added' : (in_array($action_type, ['modified', 'updated']) ? 'updated' : $action_type);
-                                    ?>
+                            <?php foreach ($tagihan_history as $history): ?>
+                                <?php 
+                                $action_type = $history['action_type'] ?? 'updated';
+                                $action_labels = [
+                                    'added' => 'Ditambahkan', 'updated' => 'Diperbarui', 'reduced' => 'Dikurangi',
+                                    'removed' => 'Dihapus', 'created' => 'Dibuat', 'modified' => 'Dimodifikasi'
+                                ];
+                                $action_label = $action_labels[$action_type] ?? ucfirst($action_type);
+                                $action_class = in_array($action_type, ['created', 'added']) ? 'added' : (in_array($action_type, ['modified', 'updated']) ? 'updated' : $action_type);
+                                ?>
                                     <tr style="border-bottom: 1px solid #f3f4f6;">
                                         <td style="padding: 6px 8px; font-size: 10px; color: #1a1a1a; font-weight: 500;">
                                             <?= htmlspecialchars($history['nama_tagihan']) ?>
@@ -2096,14 +2096,14 @@ input, textarea, select {
                                         </td>
                                         <td style="padding: 6px 8px; text-align: center;">
                                             <span class="history-action-badge action-<?= $action_class ?>" style="font-size: 8px; padding: 2px 6px; border-radius: 10px; display: inline-block;">
-                                                <?= $action_label ?>
-                                            </span>
+                                            <?= $action_label ?>
+                                        </span>
                                         </td>
                                         <td style="padding: 6px 8px; text-align: right; font-size: 9px; color: #9ca3af;">
-                                            <?= date('d/m/Y H:i', strtotime($history['created_at'])) ?>
+                                        <?= date('d/m/Y H:i', strtotime($history['created_at'])) ?>
                                         </td>
                                     </tr>
-                                <?php endforeach; ?>
+                            <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
@@ -2123,14 +2123,14 @@ input, textarea, select {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($my_payments as $payment): ?>
+                            <?php foreach ($my_payments as $payment): ?>
                                     <tr style="border-bottom: 1px solid #f3f4f6;">
                                         <td style="padding: 8px;">
                                             <div style="font-size: 10px; font-weight: 500; color: #1a1a1a; margin-bottom: 2px;"><?= htmlspecialchars($payment['tagihan']) ?></div>
                                             <div style="font-size: 8px; color: #9ca3af;"><?= date('d/m/Y', strtotime($payment['waktu_input'])) ?></div>
                                         </td>
                                         <td style="padding: 8px; text-align: right; font-size: 10px; font-weight: 600; color: #1a1a1a;">
-                                            Rp <?= number_format($payment['nominal'], 0, ',', '.') ?>
+                                                Rp <?= number_format($payment['nominal'], 0, ',', '.') ?>
                                         </td>
                                         <td style="padding: 8px; text-align: center;">
                                             <span class="status-<?= $payment['status'] ?>" style="font-size: 8px; padding: 2px 6px; border-radius: 10px; display: inline-block;">
@@ -2153,7 +2153,7 @@ input, textarea, select {
                                             <?php endif; ?>
                                         </td>
                                     </tr>
-                                <?php endforeach; ?>
+                            <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
@@ -2172,31 +2172,31 @@ input, textarea, select {
                 $absensi_data = [];
                 $absensi_error = null;
                 try {
-                    $stmt = $conn->prepare("
-                        SELECT a.*, d.nama as nama_dosen 
-                        FROM absensi a 
-                        LEFT JOIN dosen d ON a.dosen_id = d.id 
-                        WHERE a.student_id = ? 
-                        ORDER BY a.tanggal DESC, a.mata_kuliah ASC
-                    ");
+                $stmt = $conn->prepare("
+                    SELECT a.*, d.nama as nama_dosen 
+                    FROM absensi a 
+                    LEFT JOIN dosen d ON a.dosen_id = d.id 
+                    WHERE a.student_id = ? 
+                    ORDER BY a.tanggal DESC, a.mata_kuliah ASC
+                ");
                     
                     if (!$stmt) {
                         throw new Exception("Failed to prepare absensi query: " . $conn->error);
                     }
                     
-                    $stmt->bind_param("i", $student_id);
+                $stmt->bind_param("i", $student_id);
                     
                     if (!$stmt->execute()) {
                         throw new Exception("Failed to execute absensi query: " . $stmt->error);
                     }
                     
-                    $result = $stmt->get_result();
+                $result = $stmt->get_result();
                     if ($result) {
-                        while ($row = $result->fetch_assoc()) {
-                            $absensi_data[] = $row;
+                while ($row = $result->fetch_assoc()) {
+                    $absensi_data[] = $row;
                         }
-                    }
-                    $stmt->close();
+                }
+                $stmt->close();
                 } catch (Exception $e) {
                     $absensi_error = $e->getMessage();
                     error_log("Profile Absensi Error: " . $absensi_error);
@@ -2321,11 +2321,11 @@ input, textarea, select {
                     
                     $result = $stmt->get_result();
                     if ($result) {
-                        while ($row = $result->fetch_assoc()) {
-                            $barang_list[] = $row;
+                while ($row = $result->fetch_assoc()) {
+                    $barang_list[] = $row;
                         }
-                    }
-                    $stmt->close();
+                }
+                $stmt->close();
                 } catch (Exception $e) {
                     $belanja_error = $e->getMessage();
                     error_log("Profile Belanja Error: " . $belanja_error);
@@ -2376,7 +2376,7 @@ input, textarea, select {
                                     <div class="product-right">
                                         <div class="product-price">Rp <?= number_format($barang['harga'], 0, ',', '.') ?></div>
                                         <?php if ($is_available): ?>
-                                            <span class="product-add-btn">+</span>
+                                        <span class="product-add-btn">+</span>
                                         <?php else: ?>
                                             <span class="product-add-btn" style="background: #9ca3af; cursor: not-allowed;">✕</span>
                                         <?php endif; ?>
@@ -2408,35 +2408,35 @@ input, textarea, select {
                         throw new Exception("Tabel voucher_pembayaran belum ada. Silakan jalankan SQL schema terlebih dahulu.");
                     }
                     
-                    $stmt = $conn->prepare("
-                        SELECT v.*, p.total_harga, p.status as status_pesanan, p.order_id,
-                               (SELECT GROUP_CONCAT(b.nama_barang SEPARATOR ', ') 
-                                FROM detail_pesanan dp 
-                                LEFT JOIN barang b ON dp.barang_id = b.id 
-                                WHERE dp.pesanan_id = p.id) as daftar_barang
-                        FROM voucher_pembayaran v
-                        LEFT JOIN pesanan_belanja p ON v.pesanan_id = p.id
-                        WHERE v.student_id = ? AND v.status = 'pending'
-                        ORDER BY v.created_at DESC
-                    ");
+                $stmt = $conn->prepare("
+                    SELECT v.*, p.total_harga, p.status as status_pesanan, p.order_id,
+                           (SELECT GROUP_CONCAT(b.nama_barang SEPARATOR ', ') 
+                            FROM detail_pesanan dp 
+                            LEFT JOIN barang b ON dp.barang_id = b.id 
+                            WHERE dp.pesanan_id = p.id) as daftar_barang
+                    FROM voucher_pembayaran v
+                    LEFT JOIN pesanan_belanja p ON v.pesanan_id = p.id
+                    WHERE v.student_id = ? AND v.status = 'pending'
+                    ORDER BY v.created_at DESC
+                ");
                     
                     if (!$stmt) {
                         throw new Exception("Failed to prepare voucher query: " . $conn->error);
                     }
                     
-                    $stmt->bind_param("i", $student_id);
+                $stmt->bind_param("i", $student_id);
                     
                     if (!$stmt->execute()) {
                         throw new Exception("Failed to execute voucher query: " . $stmt->error);
                     }
                     
-                    $result = $stmt->get_result();
+                $result = $stmt->get_result();
                     if ($result) {
-                        while ($row = $result->fetch_assoc()) {
-                            $vouchers[] = $row;
+                while ($row = $result->fetch_assoc()) {
+                    $vouchers[] = $row;
                         }
-                    }
-                    $stmt->close();
+                }
+                $stmt->close();
                     
                     error_log("Profile Voucher - Found " . count($vouchers) . " vouchers for student_id: $student_id");
                 } catch (Exception $e) {
@@ -2447,11 +2447,8 @@ input, textarea, select {
                 }
                 ?>
                 
-                <div class="card">
-                    <h2 style="margin-bottom: 20px;">Voucher Pembayaran Saya</h2>
-                    <p style="margin-bottom: 20px; padding: 15px; background: #e3f2fd; border-radius: 8px; color: #1976d2; font-size: 14px;">
-                        <strong>Info:</strong> Voucher akan muncul setelah pembayaran belanja berhasil. Setelah admin redeem voucher, voucher akan hilang dari daftar ini.
-                    </p>
+                <div class="card" style="padding: 10px;">
+                    <h2 style="margin-bottom: 10px; font-size: 13px;">Voucher Pembayaran Saya</h2>
                     
                     <?php if ($voucher_error): ?>
                         <div class="empty-state" style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px;">
@@ -2460,51 +2457,35 @@ input, textarea, select {
                             <p style="color: #6b7280; font-size: 11px; margin-top: 10px;">Silakan hubungi administrator jika masalah berlanjut.</p>
                         </div>
                     <?php elseif (empty($vouchers)): ?>
-                        <div class="empty-state">
-                            <h3>Belum Ada Voucher</h3>
-                            <p>Anda belum memiliki voucher pembayaran yang aktif. Voucher akan muncul setelah pembayaran belanja berhasil.</p>
+                        <div class="empty-state" style="padding: 20px 10px;">
+                            <h3 style="font-size: 13px; margin-bottom: 4px;">Belum Ada Voucher</h3>
+                            <p style="font-size: 11px;">Voucher akan muncul setelah pembayaran belanja berhasil.</p>
                         </div>
                     <?php else: ?>
-                        <table>
+                        <table style="font-size: 11px;">
                             <thead>
                                 <tr>
-                                    <th>Kode Voucher</th>
-                                    <th>Order ID</th>
-                                    <th>Total Pembayaran</th>
-                                    <th>Barang yang Dibeli</th>
-                                    <th>Status Pesanan</th>
+                                    <th>Kode</th>
+                                    <th>Total</th>
                                     <th>Tanggal</th>
-                                    <th>Aksi</th>
+                                    <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($vouchers as $voucher): ?>
                                     <tr>
-                                        <td><strong style="font-size: 16px; color: #10b981;"><?= htmlspecialchars($voucher['voucher_code']) ?></strong></td>
-                                        <td><?= htmlspecialchars($voucher['order_id'] ?? '-') ?></td>
+                                        <td><strong style="font-size: 13px; color: #10b981;"><?= htmlspecialchars($voucher['voucher_code']) ?></strong></td>
                                         <td>Rp <?= number_format($voucher['total_harga'], 0, ',', '.') ?></td>
-                                        <td><?= htmlspecialchars($voucher['daftar_barang'] ?? '-') ?></td>
+                                        <td><?= date('d/m/Y', strtotime($voucher['created_at'])) ?></td>
                                         <td>
-                                            <span class="<?= $voucher['status_pesanan'] == 'berhasil' ? 'status-berhasil' : 'status-pending' ?>">
+                                            <span class="<?= $voucher['status_pesanan'] == 'berhasil' ? 'status-berhasil' : 'status-pending' ?>" style="font-size: 10px;">
                                                 <?= ucfirst($voucher['status_pesanan']) ?>
                                             </span>
-                                        </td>
-                                        <td><?= date('d/m/Y H:i', strtotime($voucher['created_at'])) ?></td>
-                                        <td>
-                                            <button class="btn btn-primary btn-small" onclick="printVoucher('<?= $voucher['voucher_code'] ?>')">
-                                                🖨️ Cetak Voucher
-                                            </button>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
-                        <p style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 8px; color: #856404; font-size: 14px;">
-                            <strong>📋 Catatan Penting:</strong><br>
-                            1. Setelah pembayaran belanja berhasil, voucher akan otomatis muncul di sini.<br>
-                            2. Cetak voucher dan tunjukkan ke admin kampus untuk menukarkan barang yang dibeli.<br>
-                            3. Setelah admin redeem voucher, voucher akan hilang dari daftar ini dan tidak bisa digunakan lagi.
-                        </p>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>

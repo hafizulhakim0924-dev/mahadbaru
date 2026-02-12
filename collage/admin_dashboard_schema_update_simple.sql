@@ -29,9 +29,29 @@ ADD COLUMN `sumber` ENUM('teller', 'aplikasi') DEFAULT 'aplikasi' AFTER `status`
 -- ============================================
 -- UPDATE DATA EXISTING
 -- ============================================
+-- Tambah kolom 'jumlah' ke tabel pembayaran jika belum ada
+ALTER TABLE `pembayaran`
+ADD COLUMN IF NOT EXISTS `jumlah` DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER `nama_tagihan`;
+
+-- Tambah kolom 'metode' jika belum ada
+ALTER TABLE `pembayaran`
+ADD COLUMN IF NOT EXISTS `metode` VARCHAR(50) NOT NULL DEFAULT 'Tunai' AFTER `jumlah`;
+
+-- Tambah kolom 'keterangan' jika belum ada
+ALTER TABLE `pembayaran`
+ADD COLUMN IF NOT EXISTS `keterangan` TEXT NULL AFTER `metode`;
+
+-- Tambah kolom 'keuangan_id' jika belum ada
+ALTER TABLE `pembayaran`
+ADD COLUMN IF NOT EXISTS `keuangan_id` INT(11) NULL AFTER `keterangan`;
+
+-- Tambah kolom 'tanggal' jika belum ada
+ALTER TABLE `pembayaran`
+ADD COLUMN IF NOT EXISTS `tanggal` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER `keuangan_id`;
+
 -- Set semua pembayaran manual menjadi 'teller'
-UPDATE `pembayaran` SET `sumber` = 'teller' WHERE `sumber` IS NULL;
+UPDATE `pembayaran` SET `sumber` = 'teller' WHERE `sumber` IS NULL OR `sumber` = '';
 
 -- Set semua pesanan_belanja yang sudah ada menjadi 'aplikasi'
-UPDATE `pesanan_belanja` SET `sumber` = 'aplikasi' WHERE `sumber` IS NULL;
+UPDATE `pesanan_belanja` SET `sumber` = 'aplikasi' WHERE `sumber` IS NULL OR `sumber` = '';
 

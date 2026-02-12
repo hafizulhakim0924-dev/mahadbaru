@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $_SESSION['is_superadmin'] = true;
                     $_SESSION['last_activity'] = time();
                     $conn->close();
-                    header('Location: dosen_dashboard.php');
+                    header('Location: dosen_absensi.php');
                     exit;
                 } elseif ($user_type == 'keuangan') {
                     $_SESSION['keuangan_id'] = 999;
@@ -110,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $stmt->close();
                     $student_conn->close();
                 }
-            } elseif ($user_type == 'dosen') {
+                } elseif ($user_type == 'dosen') {
                 // Login sebagai dosen
                 $stmt = $conn->prepare("SELECT * FROM dosen WHERE username = ? OR id = ?");
                 $stmt->bind_param("ss", $login_id, $login_id);
@@ -128,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $stmt->close();
                         $conn->close();
                         
-                        header('Location: dosen_dashboard.php');
+                        header('Location: dosen_absensi.php');
                         exit;
                     } else {
                         $error = "Password salah!";
