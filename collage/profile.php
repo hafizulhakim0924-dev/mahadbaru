@@ -601,6 +601,207 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw $e;
             }
 
+        } elseif ($action === 'create_belanja_payment') {
+            // Handle belanja checkout payment
+            $cart_data = $_POST['cart'] ?? '';
+            $method = $_POST['method'] ?? '';
+            
+            if (empty($cart_data)) {
+                throw new Exception('Data keranjang tidak valid');
+            }
+            
+            $cart = json_decode($cart_data, true);
+            if (!is_array($cart) || empty($cart)) {
+                throw new Exception('Keranjang belanja kosong');
+            }
+            
+            if (empty($method) || !preg_match('/^[A-Z0-9]+$/', $method)) {
+                throw new Exception('Metode pembayaran tidak valid');
+            }
+            
+            // START TRANSACTION
+            $conn->begin_transaction();
+            
+            try {
+                // Get barang details and calculate total
+                $total = 0;
+                $items = [];
+                
+                foreach ($cart as $item) {
+                    $barang_id = intval($item['id']);
+                    $jumlah = intval($item['jumlah']);
+                    
+                    $stmt = $conn->prepare("SELECT * FROM barang WHERE id = ? AND status = 'aktif'");
+                    $stmt->bind_param("i", $barang_id);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    $barang = $result->fetch_assoc();
+                    $stmt->close();
+                    
+                    if (!$barang || $barang['stok'] < $jumlah) {
+                        throw new Exception('Barang tidak tersedia atau stok tidak mencukupi: ' . ($barang['nama_barang'] ?? 'ID ' . $barang_id));
+                    }
+                    
+                    $subtotal = floatval($barang['harga']) * $jumlah;
+                    $total += $subtotal;
+                    $items[] = [
+                        'barang' => $barang,
+                        'jumlah' => $jumlah,
+                        'subtotal' => $subtotal
+                    ];
+                }
+                
+                if ($total <= 0 || $total > 100000000) {
+                    throw new Exception('Total pembayaran tidak valid');
+                }
+                
+                // Create order
+                $order_id = 'BLJ-' . $student_id . '-' . date('YmdHis') . '-' . rand(1000, 9999);
+                
+                // Create Tripay payment
+                $privateKey = TRIPAY_PRIVATE_KEY;
+                $merchantCode = TRIPAY_MERCHANT_CODE;
+                $signature = hash_hmac('sha256', $merchantCode . $order_id . intval($total), $privateKey);
+                
+                $order_items = [];
+                foreach ($items as $item) {
+                    $order_items[] = [
+                        'sku' => 'BRG' . $item['barang']['id'],
+                        'name' => $item['barang']['nama_barang'],
+                        'price' => intval($item['barang']['harga']),
+                        'quantity' => intval($item['jumlah'])
+                    ];
+                }
+                
+                $customer_email = (!empty($student['phone_no']) && $student['phone_no'] !== null) ? $student['phone_no'] . '@example.com' : 'student' . $student_id . '@example.com';
+                $student_name = !empty($student['name']) ? $student['name'] : 'Siswa';
+                
+                $tripay_data = [
+                    'method' => $method,
+                    'merchant_ref' => $order_id,
+                    'amount' => intval($total),
+                    'customer_name' => $student_name,
+                    'customer_email' => $customer_email,
+                    'order_items' => $order_items,
+                    'return_url' => 'https://ypi-khairaummah.sch.id/profile.php?tab=voucher',
+                    'expired_time' => (time() + 3600),
+                    'signature' => $signature,
+                    'callback_url' => 'http://kolaboraksi.app.rangkiangpedulinegeri.org/callback.php'
+                ];
+                
+                $headers = [
+                    'Authorization: Bearer ' . TRIPAY_API_KEY,
+                    'Content-Type: application/json'
+                ];
+                
+                error_log('Belanja Tripay Request: ' . json_encode($tripay_data));
+                
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, TRIPAY_API_URL . '/transaction/create');
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($tripay_data));
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curl_error = curl_error($ch);
+                curl_close($ch);
+                
+                error_log('Belanja Tripay Response Code: ' . $httpCode);
+                error_log('Belanja Tripay Response: ' . $response);
+                
+                if ($httpCode != 200) {
+                    $error_response = json_decode($response, true);
+                    $error_msg = $error_response['message'] ?? 'Koneksi ke payment gateway gagal';
+                    throw new Exception($error_msg);
+                }
+                
+                $tripay_response = json_decode($response, true);
+                
+                if (!isset($tripay_response['success']) || !$tripay_response['success']) {
+                    $error_msg = $tripay_response['message'] ?? 'Gagal membuat pembayaran';
+                    throw new Exception($error_msg);
+                }
+                
+                $tripay_result = $tripay_response['data'];
+                
+                // Save to database
+                $method_name = $tripay_result['payment_name'] ?? $method;
+                $tripay_ref = $tripay_result['reference'];
+                $pay_code = $tripay_result['pay_code'] ?? '';
+                $pay_url = $tripay_result['checkout_url'] ?? '';
+                
+                // QR String handling
+                $qr_string = '';
+                if (!empty($tripay_result['qr_string'])) {
+                    $qr_string = $tripay_result['qr_string'];
+                } elseif (!empty($tripay_result['qr_url'])) {
+                    $qr_string = $tripay_result['qr_url'];
+                } elseif (stripos($method, 'QRIS') !== false && !empty($pay_code)) {
+                    $qr_string = $pay_code;
+                }
+                
+                $expired_at = date('Y-m-d H:i:s', $tripay_result['expired_time']);
+                
+                $stmt = $conn->prepare("
+                    INSERT INTO pesanan_belanja 
+                    (student_id, order_id, total_harga, status, tripay_ref, pay_code, pay_url, qr_string, method_code, method_name, expired_at) 
+                    VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
+                ");
+                
+                $stmt->bind_param("isssssssss", $student_id, $order_id, $total, $tripay_ref, $pay_code, $pay_url, $qr_string, $method, $method_name, $expired_at);
+                
+                if (!$stmt->execute()) {
+                    throw new Exception('Gagal menyimpan pesanan');
+                }
+                
+                $pesanan_id = $stmt->insert_id;
+                $stmt->close();
+                
+                // Save detail pesanan
+                foreach ($items as $item) {
+                    $stmt = $conn->prepare("
+                        INSERT INTO detail_pesanan (pesanan_id, barang_id, jumlah, harga_satuan, subtotal) 
+                        VALUES (?, ?, ?, ?, ?)
+                    ");
+                    $stmt->bind_param("iiidd", $pesanan_id, $item['barang']['id'], $item['jumlah'], $item['barang']['harga'], $item['subtotal']);
+                    $stmt->execute();
+                    $stmt->close();
+                }
+                
+                // COMMIT TRANSACTION
+                $conn->commit();
+                
+                // Prepare response
+                $payment_data = [
+                    'order_id' => $order_id,
+                    'pesanan_id' => $pesanan_id,
+                    'total_harga' => $total,
+                    'method_name' => $method_name,
+                    'method_code' => $method,
+                    'pay_code' => $pay_code,
+                    'pay_url' => $pay_url,
+                    'qr_string' => $qr_string,
+                    'expired_at' => $expired_at,
+                    'tripay_ref' => $tripay_ref,
+                    'instructions' => $tripay_result['instructions'] ?? []
+                ];
+                
+                $response = [
+                    'success' => true,
+                    'message' => 'Pembayaran berhasil dibuat',
+                    'payment_data' => $payment_data
+                ];
+                
+            } catch (Exception $e) {
+                // ROLLBACK jika error
+                $conn->rollback();
+                error_log('Belanja payment creation failed for student ' . $student_id . ': ' . $e->getMessage());
+                throw $e;
+            }
+            
         } elseif ($action === 'check_payment') {
             $payment_id = filter_var($_POST['payment_id'] ?? '', FILTER_SANITIZE_STRING);
             
@@ -2257,6 +2458,18 @@ input, textarea, select {
         </div>
     </div>
 
+    <!-- Belanja Payment Method Modal -->
+    <div id="belanja-payment-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close-modal" onclick="closeBelanjaPaymentModal()">&times;</span>
+                <h3>Pilih Metode Pembayaran</h3>
+            </div>
+            <div class="modal-body" id="belanja-payment-body">
+            </div>
+        </div>
+    </div>
+
     <script>
         let selectedBills = new Set();
         let paymentMethods = <?= json_encode($available_methods) ?>;
@@ -2551,7 +2764,7 @@ input, textarea, select {
             
             if (payment.qr_string) {
                 setTimeout(() => {
-                    generateQRCode(payment.qr_string);
+                    generateQRCode(payment.qr_string, 'qr-canvas');
                 }, 100);
             }
             
@@ -2694,8 +2907,8 @@ input, textarea, select {
             return div.innerHTML;
         }
 
-        function generateQRCode(text) {
-            const canvas = document.getElementById('qr-canvas');
+        function generateQRCode(text, canvasId = 'qr-canvas') {
+            const canvas = document.getElementById(canvasId);
             if (!canvas) return;
             
             // Prioritas: gunakan library QRious jika tersedia
@@ -2823,6 +3036,10 @@ input, textarea, select {
         function closeReceiptModal() {
             document.getElementById('receipt-modal').style.display = 'none';
         }
+        
+        function closeBelanjaPaymentModal() {
+            document.getElementById('belanja-payment-modal').style.display = 'none';
+        }
 
         function printReceipt() {
             window.print();
@@ -2831,17 +3048,22 @@ input, textarea, select {
         window.onclick = function(event) {
             const paymentModal = document.getElementById('payment-modal');
             const receiptModal = document.getElementById('receipt-modal');
+            const belanjaPaymentModal = document.getElementById('belanja-payment-modal');
             if (event.target === paymentModal) {
                 closeModal();
             }
             if (event.target === receiptModal) {
                 closeReceiptModal();
             }
+            if (event.target === belanjaPaymentModal) {
+                closeBelanjaPaymentModal();
+            }
         }
 
         // Cleanup polling saat page unload
         window.addEventListener('beforeunload', function() {
             stopPolling();
+            stopBelanjaPolling();
         });
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -2943,9 +3165,212 @@ input, textarea, select {
                 return;
             }
             
-            if (confirm('Apakah Anda yakin ingin checkout? Anda akan diarahkan ke halaman pembayaran.')) {
-                // Redirect to belanja checkout page
-                window.location.href = 'belanja_checkout.php?cart=' + encodeURIComponent(JSON.stringify(cart));
+            // Calculate total
+            let total = 0;
+            cart.forEach(item => {
+                total += item.harga * item.jumlah;
+            });
+            
+            // Show payment method selection modal
+            showBelanjaPaymentModal(total);
+        }
+        
+        function showBelanjaPaymentModal(total) {
+            const modal = document.getElementById('belanja-payment-modal');
+            const modalBody = document.getElementById('belanja-payment-body');
+            
+            let methodsHtml = '<option value="">Pilih Metode Pembayaran</option>';
+            paymentMethods.forEach(method => {
+                methodsHtml += `<option value="${method.code}">${method.name}</option>`;
+            });
+            
+            modalBody.innerHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 10px;">Checkout Belanja</h3>
+                    <p style="font-size: 18px; font-weight: 600; color: #10b981;">
+                        Total: Rp ${total.toLocaleString('id-ID')}
+                    </p>
+                </div>
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Metode Pembayaran:</label>
+                    <select id="belanja-payment-method" style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px;">
+                        ${methodsHtml}
+                    </select>
+                </div>
+                <button class="btn btn-primary btn-full" onclick="processBelanjaPayment()" id="belanja-pay-btn">
+                    Bayar Sekarang
+                </button>
+            `;
+            
+            modal.style.display = 'block';
+        }
+        
+        async function processBelanjaPayment() {
+            const method = document.getElementById('belanja-payment-method').value;
+            if (!method) {
+                alert('Pilih metode pembayaran terlebih dahulu');
+                return;
+            }
+            
+            const payBtn = document.getElementById('belanja-pay-btn');
+            const originalText = payBtn.textContent;
+            payBtn.textContent = 'Memproses...';
+            payBtn.disabled = true;
+            
+            try {
+                const formData = new FormData();
+                formData.append('action', 'create_belanja_payment');
+                formData.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+                formData.append('cart', JSON.stringify(cart));
+                formData.append('method', method);
+                
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Close payment method modal
+                    document.getElementById('belanja-payment-modal').style.display = 'none';
+                    
+                    // Show payment details modal
+                    showBelanjaPaymentDetails(result.payment_data);
+                    
+                    // Start auto polling
+                    startBelanjaPolling(result.payment_data.order_id);
+                    
+                    // Clear cart
+                    cart = [];
+                    updateCartDisplay();
+                } else {
+                    alert('Error: ' + result.message);
+                    payBtn.textContent = originalText;
+                    payBtn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Payment creation error:', error);
+                alert('Terjadi kesalahan: ' + error.message);
+                payBtn.textContent = originalText;
+                payBtn.disabled = false;
+            }
+        }
+        
+        function showBelanjaPaymentDetails(payment) {
+            const modal = document.getElementById('payment-modal');
+            const modalBody = document.getElementById('modal-body');
+            
+            let content = `
+                <div class="payment-info">
+                    <h4>Pembayaran Belanja</h4>
+                    <p><strong>Order ID:</strong> ${payment.order_id}</p>
+                    <p><strong>Total:</strong> Rp ${parseInt(payment.total_harga).toLocaleString('id-ID')}</p>
+                    <p><strong>Metode:</strong> ${payment.method_name}</p>
+                    <p><strong>Berakhir:</strong> ${new Date(payment.expired_at).toLocaleString('id-ID')}</p>
+                    <p style="font-size: 12px; color: #666; margin-top: 15px;">
+                        💡 Setelah transfer, pembayaran akan otomatis terdeteksi dan voucher akan muncul
+                    </p>
+                </div>
+            `;
+            
+            if (payment.pay_code && !payment.qr_string && payment.method_code.indexOf('VA') === -1) {
+                content += `
+                    <div class="va-number">
+                        ${payment.pay_code}
+                    </div>
+                    <p style="text-align: center; font-size: 12px; color: #666;">
+                        Nomor Virtual Account
+                    </p>
+                    <button class="btn btn-primary btn-small" onclick="copyToClipboard('${payment.pay_code}')" style="margin: 10px 0;">
+                        Salin Nomor
+                    </button>
+                `;
+            }
+            
+            if (payment.qr_string) {
+                content += `
+                    <div class="qr-container">
+                        <canvas id="belanja-qr-canvas"></canvas>
+                        <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                            Scan QR Code untuk membayar
+                        </p>
+                    </div>
+                `;
+            }
+            
+            if (payment.pay_url) {
+                content += `
+                    <a href="${payment.pay_url}" target="_blank" class="btn btn-primary btn-full" style="margin: 10px 0;">
+                        Bayar Sekarang
+                    </a>
+                `;
+            }
+            
+            if (payment.instructions && payment.instructions.length > 0) {
+                content += `
+                    <div class="instruction-list">
+                        <strong>Cara Pembayaran:</strong>
+                        <ol>
+                `;
+                
+                payment.instructions.forEach(instruction => {
+                    if (typeof instruction === 'object' && instruction.title) {
+                        content += `<li><strong>${instruction.title}</strong>`;
+                        if (instruction.steps && instruction.steps.length > 0) {
+                            instruction.steps.forEach(step => {
+                                content += `<br>- ${step}`;
+                            });
+                        }
+                        content += `</li>`;
+                    } else {
+                        content += `<li>${instruction}</li>`;
+                    }
+                });
+                
+                content += `
+                        </ol>
+                    </div>
+                `;
+            }
+            
+            modalBody.innerHTML = content;
+            modal.style.display = 'block';
+            
+            if (payment.qr_string) {
+                setTimeout(() => {
+                    generateQRCode(payment.qr_string, 'belanja-qr-canvas');
+                }, 100);
+            }
+        }
+        
+        let belanjaPollingInterval = null;
+        
+        function startBelanjaPolling(orderId) {
+            stopBelanjaPolling();
+            
+            belanjaPollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`check_payment_belanja.php?order_id=${encodeURIComponent(orderId)}`);
+                    const result = await response.json();
+                    
+                    if (result.success && result.status === 'berhasil') {
+                        stopBelanjaPolling();
+                        alert('✅ Pembayaran berhasil!\n\nVoucher akan muncul di tab Voucher. Halaman akan dimuat ulang.');
+                        setTimeout(() => {
+                            window.location.href = '?tab=voucher';
+                        }, 1000);
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 5000);
+        }
+        
+        function stopBelanjaPolling() {
+            if (belanjaPollingInterval) {
+                clearInterval(belanjaPollingInterval);
+                belanjaPollingInterval = null;
             }
         }
         
