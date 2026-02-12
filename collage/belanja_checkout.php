@@ -182,8 +182,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['method'])) {
             $tripay_ref = $tripay_result['reference'];
             $pay_code = $tripay_result['pay_code'] ?? '';
             $pay_url = $tripay_result['checkout_url'] ?? '';
-            $qr_string = $tripay_result['qr_string'] ?? '';
+            
+            // QR String handling - cek beberapa kemungkinan field
+            $qr_string = '';
+            if (!empty($tripay_result['qr_string'])) {
+                $qr_string = $tripay_result['qr_string'];
+            } elseif (!empty($tripay_result['qr_url'])) {
+                $qr_string = $tripay_result['qr_url'];
+            } elseif (stripos($method, 'QRIS') !== false && !empty($pay_code)) {
+                // Untuk QRIS, gunakan pay_code sebagai QR string jika qr_string tidak ada
+                $qr_string = $pay_code;
+            }
+            
             $expired_at = date('Y-m-d H:i:s', $tripay_result['expired_time']);
+            
+            // Log untuk debugging
+            error_log('Belanja QR String: ' . ($qr_string ?: 'EMPTY'));
+            error_log('Belanja Pay Code: ' . ($pay_code ?: 'EMPTY'));
+            error_log('Belanja Method: ' . $method);
             
             $stmt->bind_param("isssssssss", $student_id, $order_id, $total, $tripay_ref, $pay_code, $pay_url, $qr_string, $method, $method_name, $expired_at);
             $stmt->execute();

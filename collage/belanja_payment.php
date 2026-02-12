@@ -3,9 +3,9 @@ session_start();
 
 // Database Config
 $servername = "localhost";
-$username = "ypikhair_admin";
-$password = "hakim123123123";
-$dbname = "ypikhair_datautama";
+$username = "ypikhair_adminmahadzubair";
+$password = "Hakim123!";
+$dbname = "ypikhair_mahadzubair";
 
 // Check login
 if (!isset($_SESSION['student']['id']) && !isset($_SESSION['user_id'])) {
@@ -42,6 +42,12 @@ if (!$pesanan) {
     header('Location: profile.php?tab=belanja');
     exit;
 }
+
+// Debug log
+error_log('Belanja Payment - Order ID: ' . $order_id);
+error_log('Belanja Payment - QR String: ' . ($pesanan['qr_string'] ?: 'EMPTY'));
+error_log('Belanja Payment - Pay Code: ' . ($pesanan['pay_code'] ?: 'EMPTY'));
+error_log('Belanja Payment - Method: ' . ($pesanan['method_code'] ?: 'EMPTY'));
 
 $conn->close();
 ?>
@@ -81,7 +87,18 @@ $conn->close();
                 <p><strong>Berakhir:</strong> <?= date('d/m/Y H:i', strtotime($pesanan['expired_at'])) ?></p>
             </div>
 
-            <?php if ($pesanan['pay_code']): ?>
+            <?php 
+            // Determine QR string - gunakan qr_string jika ada, atau pay_code untuk QRIS
+            $qr_string_display = '';
+            if (!empty($pesanan['qr_string'])) {
+                $qr_string_display = $pesanan['qr_string'];
+            } elseif (stripos($pesanan['method_code'] ?? '', 'QRIS') !== false && !empty($pesanan['pay_code'])) {
+                // Untuk QRIS, gunakan pay_code sebagai QR string
+                $qr_string_display = $pesanan['pay_code'];
+            }
+            ?>
+            
+            <?php if ($pesanan['pay_code'] && stripos($pesanan['method_code'] ?? '', 'QRIS') === false): ?>
                 <div class="va-number">
                     <?= htmlspecialchars($pesanan['pay_code']) ?>
                 </div>
@@ -90,7 +107,7 @@ $conn->close();
                 </p>
             <?php endif; ?>
 
-            <?php if ($pesanan['qr_string']): ?>
+            <?php if ($qr_string_display): ?>
                 <div class="qr-container">
                     <canvas id="qr-canvas"></canvas>
                     <p style="font-size: 12px; color: #666; margin-top: 10px;">
@@ -112,28 +129,59 @@ $conn->close();
     </div>
 
     <script>
-        <?php if ($pesanan['qr_string']): ?>
+        <?php if ($qr_string_display): ?>
         // Generate QR Code
-        setTimeout(() => {
+        function generateQRCode() {
+            const canvas = document.getElementById('qr-canvas');
+            if (!canvas) return;
+            
+            const qrValue = '<?= addslashes($qr_string_display) ?>';
+            
+            // Prioritas: gunakan library QRious jika tersedia
             if (typeof QRious !== 'undefined') {
-                new QRious({
-                    element: document.getElementById('qr-canvas'),
-                    value: '<?= addslashes($pesanan['qr_string']) ?>',
-                    size: 250,
-                    background: 'white',
-                    foreground: 'black',
-                    level: 'H'
-                });
-            } else {
-                const canvas = document.getElementById('qr-canvas');
-                const img = document.createElement('img');
-                img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent('<?= addslashes($pesanan['qr_string']) ?>');
-                img.style.maxWidth = '250px';
-                img.style.height = 'auto';
-                canvas.parentElement.appendChild(img);
-                canvas.style.display = 'none';
+                try {
+                    new QRious({
+                        element: canvas,
+                        value: qrValue,
+                        size: 250,
+                        background: 'white',
+                        foreground: 'black',
+                        level: 'H' // High error correction untuk QRIS
+                    });
+                    return;
+                } catch (error) {
+                    console.error('QRious error:', error);
+                }
             }
-        }, 100);
+            
+            // Fallback ke API QR Generator
+            canvas.style.display = 'none';
+            const qrContainer = canvas.parentElement;
+            const img = document.createElement('img');
+            img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(qrValue) + '&margin=10';
+            img.alt = 'QR Code Pembayaran';
+            img.style.maxWidth = '250px';
+            img.style.height = 'auto';
+            img.style.border = '1px solid #dee2e6';
+            img.style.borderRadius = '8px';
+            img.style.margin = '10px auto';
+            img.style.display = 'block';
+            
+            img.onerror = function() {
+                this.style.display = 'none';
+                const errorMsg = document.createElement('p');
+                errorMsg.textContent = 'Gagal memuat QR Code. Gunakan metode pembayaran alternatif.';
+                errorMsg.style.color = '#dc3545';
+                errorMsg.style.textAlign = 'center';
+                errorMsg.style.padding = '20px';
+                qrContainer.appendChild(errorMsg);
+            };
+            
+            qrContainer.appendChild(img);
+        }
+        
+        // Generate QR code setelah halaman dimuat
+        setTimeout(generateQRCode, 100);
         <?php endif; ?>
 
         // Auto check payment status
