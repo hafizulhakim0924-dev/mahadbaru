@@ -461,21 +461,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
     elseif ($action == 'search_students' && isset($_POST['query'])) {
         header('Content-Type: application/json');
         $query = trim($_POST['query']);
-        $results = [];
         
-        if (strlen($query) >= 2) {
-            $search = "%$query%";
-            $stmt = $conn->prepare("SELECT id, name, class FROM students WHERE name LIKE ? OR id LIKE ? ORDER BY name ASC LIMIT 10");
-            $stmt->bind_param("ss", $search, $search);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            while ($row = $result->fetch_assoc()) {
-                $results[] = $row;
+        try {
+            $results = [];
+            
+            if (strlen($query) >= 2) {
+                $search = "%$query%";
+                $stmt = $conn->prepare("SELECT id, name, class FROM students WHERE name LIKE ? OR id LIKE ? ORDER BY name ASC LIMIT 10");
+                if (!$stmt) {
+                    throw new Exception("Gagal mempersiapkan query siswa: " . $conn->error);
+                }
+                
+                $stmt->bind_param("ss", $search, $search);
+                if (!$stmt->execute()) {
+                    throw new Exception("Gagal mengeksekusi query siswa: " . $stmt->error);
+                }
+                
+                $result = $stmt->get_result();
+                while ($row = $result->fetch_assoc()) {
+                    $results[] = $row;
+                }
+                $stmt->close();
             }
-            $stmt->close();
+            
+            echo json_encode([
+                'success' => true,
+                'data' => $results
+            ]);
+        } catch (Exception $e) {
+            $msg = "AdminDashboard - search_students Error: " . $e->getMessage();
+            error_log($msg);
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
         }
-        
-        echo json_encode($results);
         exit;
     }
     
@@ -1515,11 +1535,19 @@ try {
                     })
                     .then(response => response.json())
                     .then(data => {
+                        if (data && data.success === false) {
+                            console.error('search_students error:', data.error);
+                            alert('Terjadi kesalahan saat mencari siswa: ' + data.error);
+                            return;
+                        }
+                        
+                        const list = Array.isArray(data) ? data : (data.data || []);
+                        
                         tellerSearchResults.innerHTML = '';
-                        if (data.length === 0) {
+                        if (!list || list.length === 0) {
                             tellerSearchResults.innerHTML = '<div style="padding: 15px; text-align: center; color: #666;">Tidak ditemukan</div>';
                         } else {
-                            data.forEach(student => {
+                            list.forEach(student => {
                                 const div = document.createElement('div');
                                 div.style.cssText = 'padding: 12px; cursor: pointer; border-bottom: 1px solid #e2e8f0;';
                                 div.innerHTML = `<strong>${student.name}</strong> (ID: ${student.id}) - ${student.class || '-'}`;
@@ -1631,11 +1659,19 @@ try {
                     })
                     .then(response => response.json())
                     .then(data => {
+                        if (data && data.success === false) {
+                            console.error('search_students error:', data.error);
+                            alert('Terjadi kesalahan saat mencari siswa: ' + data.error);
+                            return;
+                        }
+                        
+                        const list = Array.isArray(data) ? data : (data.data || []);
+                        
                         belanjaSearchResults.innerHTML = '';
-                        if (data.length === 0) {
+                        if (!list || list.length === 0) {
                             belanjaSearchResults.innerHTML = '<div style="padding: 15px; text-align: center; color: #666;">Tidak ditemukan</div>';
                         } else {
-                            data.forEach(student => {
+                            list.forEach(student => {
                                 const div = document.createElement('div');
                                 div.style.cssText = 'padding: 12px; cursor: pointer; border-bottom: 1px solid #e2e8f0;';
                                 div.innerHTML = `<strong>${student.name}</strong> (ID: ${student.id}) - ${student.class || '-'}`;
