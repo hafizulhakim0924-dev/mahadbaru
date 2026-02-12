@@ -1848,26 +1848,51 @@ input, textarea, select {
             <?php elseif ($current_tab == 'absensi'): ?>
                 <?php
                 // Get absensi data for current student
-                $stmt = $conn->prepare("
-                    SELECT a.*, d.nama as nama_dosen 
-                    FROM absensi a 
-                    LEFT JOIN dosen d ON a.dosen_id = d.id 
-                    WHERE a.student_id = ? 
-                    ORDER BY a.tanggal DESC, a.mata_kuliah ASC
-                ");
-                $stmt->bind_param("i", $student_id);
-                $stmt->execute();
-                $result = $stmt->get_result();
                 $absensi_data = [];
-                while ($row = $result->fetch_assoc()) {
-                    $absensi_data[] = $row;
+                $absensi_error = null;
+                try {
+                    $stmt = $conn->prepare("
+                        SELECT a.*, d.nama as nama_dosen 
+                        FROM absensi a 
+                        LEFT JOIN dosen d ON a.dosen_id = d.id 
+                        WHERE a.student_id = ? 
+                        ORDER BY a.tanggal DESC, a.mata_kuliah ASC
+                    ");
+                    
+                    if (!$stmt) {
+                        throw new Exception("Failed to prepare absensi query: " . $conn->error);
+                    }
+                    
+                    $stmt->bind_param("i", $student_id);
+                    
+                    if (!$stmt->execute()) {
+                        throw new Exception("Failed to execute absensi query: " . $stmt->error);
+                    }
+                    
+                    $result = $stmt->get_result();
+                    if ($result) {
+                        while ($row = $result->fetch_assoc()) {
+                            $absensi_data[] = $row;
+                        }
+                    }
+                    $stmt->close();
+                } catch (Exception $e) {
+                    $absensi_error = $e->getMessage();
+                    error_log("Profile Absensi Error: " . $absensi_error);
+                    // Continue with empty array if query fails
+                    $absensi_data = [];
                 }
-                $stmt->close();
                 ?>
                 
                 <div class="card" style="padding: 16px;">
                     <h2 style="margin-bottom: 12px; font-size: 16px; font-weight: 600;">Rekap Absensi</h2>
-                    <?php if (empty($absensi_data)): ?>
+                    <?php if ($absensi_error): ?>
+                        <div class="empty-state" style="padding: 30px 20px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;">
+                            <h3 style="font-size: 14px; color: #dc2626;">⚠️ Error Memuat Data Absensi</h3>
+                            <p style="font-size: 12px; color: #991b1b; margin-top: 10px;"><?= htmlspecialchars($absensi_error) ?></p>
+                            <p style="font-size: 11px; color: #6b7280; margin-top: 10px;">Silakan hubungi administrator jika masalah berlanjut.</p>
+                        </div>
+                    <?php elseif (empty($absensi_data)): ?>
                         <div class="empty-state" style="padding: 30px 20px;">
                             <h3 style="font-size: 14px;">Belum Ada Data Absensi</h3>
                             <p style="font-size: 13px;">Data absensi akan muncul setelah dosen menginput kehadiran Anda.</p>
@@ -1958,19 +1983,43 @@ input, textarea, select {
             <?php elseif ($current_tab == 'belanja'): ?>
                 <?php
                 // Get available items
-                $stmt = $conn->prepare("SELECT * FROM barang WHERE status = 'aktif' AND stok > 0 ORDER BY nama_barang ASC");
-                $stmt->execute();
-                $result = $stmt->get_result();
                 $barang_list = [];
-                while ($row = $result->fetch_assoc()) {
-                    $barang_list[] = $row;
+                $belanja_error = null;
+                try {
+                    $stmt = $conn->prepare("SELECT * FROM barang WHERE status = 'aktif' AND stok > 0 ORDER BY nama_barang ASC");
+                    
+                    if (!$stmt) {
+                        throw new Exception("Failed to prepare barang query: " . $conn->error);
+                    }
+                    
+                    if (!$stmt->execute()) {
+                        throw new Exception("Failed to execute barang query: " . $stmt->error);
+                    }
+                    
+                    $result = $stmt->get_result();
+                    if ($result) {
+                        while ($row = $result->fetch_assoc()) {
+                            $barang_list[] = $row;
+                        }
+                    }
+                    $stmt->close();
+                } catch (Exception $e) {
+                    $belanja_error = $e->getMessage();
+                    error_log("Profile Belanja Error: " . $belanja_error);
+                    // Continue with empty array if query fails
+                    $barang_list = [];
                 }
-                $stmt->close();
                 
                 ?>
                 
                 <div style="padding: 8px 12px;">
-                    <?php if (empty($barang_list)): ?>
+                    <?php if ($belanja_error): ?>
+                        <div class="empty-state" style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px;">
+                            <h3 style="color: #dc2626;">⚠️ Error Memuat Data Barang</h3>
+                            <p style="color: #991b1b; font-size: 12px; margin-top: 10px;"><?= htmlspecialchars($belanja_error) ?></p>
+                            <p style="color: #6b7280; font-size: 11px; margin-top: 10px;">Silakan hubungi administrator jika masalah berlanjut.</p>
+                        </div>
+                    <?php elseif (empty($barang_list)): ?>
                         <div class="empty-state">
                             <h3>Tidak Ada Barang Tersedia</h3>
                             <p>Barang akan muncul setelah admin menambahkan produk.</p>
@@ -2008,25 +2057,42 @@ input, textarea, select {
             <?php elseif ($current_tab == 'voucher'): ?>
                 <?php
                 // Get vouchers for current student (hanya yang belum diredeem)
-                $stmt = $conn->prepare("
-                    SELECT v.*, p.total_harga, p.status as status_pesanan, p.order_id,
-                           (SELECT GROUP_CONCAT(b.nama_barang SEPARATOR ', ') 
-                            FROM detail_pesanan dp 
-                            LEFT JOIN barang b ON dp.barang_id = b.id 
-                            WHERE dp.pesanan_id = p.id) as daftar_barang
-                    FROM voucher_pembayaran v
-                    LEFT JOIN pesanan_belanja p ON v.pesanan_id = p.id
-                    WHERE v.student_id = ? AND v.status = 'pending'
-                    ORDER BY v.created_at DESC
-                ");
-                $stmt->bind_param("i", $student_id);
-                $stmt->execute();
-                $result = $stmt->get_result();
                 $vouchers = [];
-                while ($row = $result->fetch_assoc()) {
-                    $vouchers[] = $row;
+                try {
+                    $stmt = $conn->prepare("
+                        SELECT v.*, p.total_harga, p.status as status_pesanan, p.order_id,
+                               (SELECT GROUP_CONCAT(b.nama_barang SEPARATOR ', ') 
+                                FROM detail_pesanan dp 
+                                LEFT JOIN barang b ON dp.barang_id = b.id 
+                                WHERE dp.pesanan_id = p.id) as daftar_barang
+                        FROM voucher_pembayaran v
+                        LEFT JOIN pesanan_belanja p ON v.pesanan_id = p.id
+                        WHERE v.student_id = ? AND v.status = 'pending'
+                        ORDER BY v.created_at DESC
+                    ");
+                    
+                    if (!$stmt) {
+                        throw new Exception("Failed to prepare voucher query: " . $conn->error);
+                    }
+                    
+                    $stmt->bind_param("i", $student_id);
+                    
+                    if (!$stmt->execute()) {
+                        throw new Exception("Failed to execute voucher query: " . $stmt->error);
+                    }
+                    
+                    $result = $stmt->get_result();
+                    if ($result) {
+                        while ($row = $result->fetch_assoc()) {
+                            $vouchers[] = $row;
+                        }
+                    }
+                    $stmt->close();
+                } catch (Exception $e) {
+                    error_log("Profile Voucher Error: " . $e->getMessage());
+                    // Continue with empty array if query fails
+                    $vouchers = [];
                 }
-                $stmt->close();
                 ?>
                 
                 <div class="card">
