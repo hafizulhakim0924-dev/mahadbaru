@@ -169,45 +169,56 @@ try {
                 
                 // Jika berhasil, create voucher (jika belum ada)
                 if ($new_status === 'berhasil') {
+                    error_log("Payment successful, attempting to create voucher for order: $order_id, pesanan_id: {$pesanan['id']}, student_id: {$pesanan['student_id']}");
+                    
                     try {
                         // Cek apakah voucher sudah ada
                         $stmt_check = $conn->prepare("SELECT id FROM voucher_pembayaran WHERE pesanan_id = ?");
-                        if ($stmt_check) {
-                            $stmt_check->bind_param("i", $pesanan['id']);
-                            $stmt_check->execute();
-                            $result_check = $stmt_check->get_result();
-                            $existing_voucher = $result_check->fetch_assoc();
-                            $stmt_check->close();
-                            
-                            if (!$existing_voucher) {
-                                // Generate voucher code
-                                $voucher_code = 'VCH-' . strtoupper(substr(md5($order_id . time() . rand()), 0, 10));
-                                
-                                // Create voucher
-                                $stmt2 = $conn->prepare("
-                                    INSERT INTO voucher_pembayaran (student_id, pesanan_id, voucher_code, status) 
-                                    VALUES (?, ?, ?, 'pending')
-                                ");
-                                if ($stmt2) {
-                                    $stmt2->bind_param("iis", $pesanan['student_id'], $pesanan['id'], $voucher_code);
-                                    if ($stmt2->execute()) {
-                                        error_log("Voucher created: $voucher_code for student {$pesanan['student_id']}, order: $order_id, pesanan_id: {$pesanan['id']}");
-                                    } else {
-                                        error_log("Failed to create voucher: " . $stmt2->error);
-                                    }
-                                    $stmt2->close();
-                                } else {
-                                    error_log("Failed to prepare voucher insert query: " . $conn->error);
-                                }
-                            } else {
-                                error_log("Voucher already exists for order: $order_id, pesanan_id: {$pesanan['id']}");
-                            }
-                        } else {
+                        if (!$stmt_check) {
                             error_log("Failed to prepare voucher check query: " . $conn->error);
+                        } else {
+                            $stmt_check->bind_param("i", $pesanan['id']);
+                            if (!$stmt_check->execute()) {
+                                error_log("Failed to execute voucher check query: " . $stmt_check->error);
+                            } else {
+                                $result_check = $stmt_check->get_result();
+                                $existing_voucher = $result_check->fetch_assoc();
+                                $stmt_check->close();
+                                
+                                if (!$existing_voucher) {
+                                    // Generate voucher code
+                                    $voucher_code = 'VCH-' . strtoupper(substr(md5($order_id . time() . rand()), 0, 10));
+                                    
+                                    error_log("Creating new voucher: $voucher_code for pesanan_id: {$pesanan['id']}, student_id: {$pesanan['student_id']}");
+                                    
+                                    // Create voucher
+                                    $stmt2 = $conn->prepare("
+                                        INSERT INTO voucher_pembayaran (student_id, pesanan_id, voucher_code, status) 
+                                        VALUES (?, ?, ?, 'pending')
+                                    ");
+                                    if (!$stmt2) {
+                                        error_log("Failed to prepare voucher insert query: " . $conn->error);
+                                    } else {
+                                        $stmt2->bind_param("iis", $pesanan['student_id'], $pesanan['id'], $voucher_code);
+                                        if ($stmt2->execute()) {
+                                            $voucher_id = $stmt2->insert_id;
+                                            error_log("✅ Voucher created successfully! ID: $voucher_id, Code: $voucher_code, Student: {$pesanan['student_id']}, Order: $order_id, Pesanan ID: {$pesanan['id']}");
+                                        } else {
+                                            error_log("❌ Failed to create voucher (execute): " . $stmt2->error);
+                                        }
+                                        $stmt2->close();
+                                    }
+                                } else {
+                                    error_log("ℹ️ Voucher already exists for order: $order_id, pesanan_id: {$pesanan['id']}, voucher_id: {$existing_voucher['id']}");
+                                }
+                            }
                         }
                     } catch (Exception $e) {
-                        error_log("Error creating voucher: " . $e->getMessage());
+                        error_log("❌ Exception creating voucher: " . $e->getMessage());
+                        error_log("Stack trace: " . $e->getTraceAsString());
                     }
+                } else {
+                    error_log("Payment status is not 'berhasil' (status: $new_status), skipping voucher creation");
                 }
                 
                 $stmt->close();

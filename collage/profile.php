@@ -2076,7 +2076,14 @@ input, textarea, select {
                 <?php
                 // Get vouchers for current student (hanya yang belum diredeem)
                 $vouchers = [];
+                $voucher_error = null;
                 try {
+                    // Cek apakah tabel voucher_pembayaran ada
+                    $check_table = $conn->query("SHOW TABLES LIKE 'voucher_pembayaran'");
+                    if ($check_table && $check_table->num_rows == 0) {
+                        throw new Exception("Tabel voucher_pembayaran belum ada. Silakan jalankan SQL schema terlebih dahulu.");
+                    }
+                    
                     $stmt = $conn->prepare("
                         SELECT v.*, p.total_harga, p.status as status_pesanan, p.order_id,
                                (SELECT GROUP_CONCAT(b.nama_barang SEPARATOR ', ') 
@@ -2106,8 +2113,11 @@ input, textarea, select {
                         }
                     }
                     $stmt->close();
+                    
+                    error_log("Profile Voucher - Found " . count($vouchers) . " vouchers for student_id: $student_id");
                 } catch (Exception $e) {
-                    error_log("Profile Voucher Error: " . $e->getMessage());
+                    $voucher_error = $e->getMessage();
+                    error_log("Profile Voucher Error: " . $voucher_error);
                     // Continue with empty array if query fails
                     $vouchers = [];
                 }
@@ -2119,7 +2129,13 @@ input, textarea, select {
                         <strong>Info:</strong> Voucher akan muncul setelah pembayaran belanja berhasil. Setelah admin redeem voucher, voucher akan hilang dari daftar ini.
                     </p>
                     
-                    <?php if (empty($vouchers)): ?>
+                    <?php if ($voucher_error): ?>
+                        <div class="empty-state" style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px;">
+                            <h3 style="color: #dc2626;">⚠️ Error Memuat Data Voucher</h3>
+                            <p style="color: #991b1b; font-size: 12px; margin-top: 10px;"><?= htmlspecialchars($voucher_error) ?></p>
+                            <p style="color: #6b7280; font-size: 11px; margin-top: 10px;">Silakan hubungi administrator jika masalah berlanjut.</p>
+                        </div>
+                    <?php elseif (empty($vouchers)): ?>
                         <div class="empty-state">
                             <h3>Belum Ada Voucher</h3>
                             <p>Anda belum memiliki voucher pembayaran yang aktif. Voucher akan muncul setelah pembayaran belanja berhasil.</p>
