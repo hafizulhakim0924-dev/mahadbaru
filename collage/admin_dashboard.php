@@ -305,10 +305,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 $check_col = $conn->query("SHOW COLUMNS FROM pembayaran LIKE 'sumber'");
                 if ($check_col && $check_col->num_rows > 0) {
                     $stmt = $conn->prepare("INSERT INTO pembayaran (student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id, sumber) VALUES (?, ?, ?, ?, ?, ?, 'teller')");
-                    $stmt->bind_param("isdsis", $student_id, $nama_tagihan_str, $total, $metode, $keterangan_full, $admin_id);
+                    $stmt->bind_param("isdssi", $student_id, $nama_tagihan_str, $total, $metode, $keterangan_full, $admin_id);
                 } else {
                     $stmt = $conn->prepare("INSERT INTO pembayaran (student_id, nama_tagihan, jumlah, metode, keterangan, keuangan_id) VALUES (?, ?, ?, ?, ?, ?)");
-                    $stmt->bind_param("isdsi", $student_id, $nama_tagihan_str, $total, $metode, $keterangan_full, $admin_id);
+                    $stmt->bind_param("isdssi", $student_id, $nama_tagihan_str, $total, $metode, $keterangan_full, $admin_id);
                 }
                 
                 if (!$stmt->execute()) {
@@ -406,10 +406,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 $check_col = $conn->query("SHOW COLUMNS FROM pesanan_belanja LIKE 'sumber'");
                 if ($check_col && $check_col->num_rows > 0) {
                     $stmt = $conn->prepare("INSERT INTO pesanan_belanja (student_id, order_id, total_harga, status, method_code, method_name, sumber) VALUES (?, ?, ?, 'berhasil', ?, ?, 'teller')");
-                    $stmt->bind_param("isds", $student_id, $order_id, $total, $metode, $method_name);
+                    $stmt->bind_param("isdss", $student_id, $order_id, $total, $metode, $method_name);
                 } else {
                     $stmt = $conn->prepare("INSERT INTO pesanan_belanja (student_id, order_id, total_harga, status, method_code, method_name) VALUES (?, ?, ?, 'berhasil', ?, ?)");
-                    $stmt->bind_param("isds", $student_id, $order_id, $total, $metode, $method_name);
+                    $stmt->bind_param("isdss", $student_id, $order_id, $total, $metode, $method_name);
                 }
                 if (!$stmt->execute()) {
                     throw new Exception("Gagal membuat pesanan: " . $stmt->error);
@@ -917,8 +917,8 @@ try {
             </div>
             <div class="menu-card <?= $current_tab == 'bayar_teller' ? 'active' : '' ?>" onclick="showSection('bayar_teller')">
                 <div class="menu-card-icon">🏦</div>
-                <h3>Bayar melalui Teller</h3>
-                <p>Bayar tagihan via teller</p>
+                <h3>Bayar Tagihan Sekolah Manual</h3>
+                <p>Pilih ID, pilih tagihan, bayar tunai</p>
             </div>
             <div class="menu-card <?= $current_tab == 'bayar_manual' ? 'active' : '' ?>" onclick="showSection('bayar_manual')">
                 <div class="menu-card-icon">💳</div>
@@ -1085,9 +1085,9 @@ try {
                 </form>
             </div>
             
-            <!-- Bayar melalui Teller Section -->
+            <!-- Bayar Tagihan Sekolah Manual Section -->
             <div id="section-bayar_teller" class="content-section <?= $current_tab == 'bayar_teller' ? 'active' : '' ?>">
-                <h2 style="margin-bottom: 20px; color: #2d3748;">🏦 Bayar melalui Teller</h2>
+                <h2 style="margin-bottom: 20px; color: #2d3748;">🏦 Bayar Tagihan Sekolah Manual</h2>
                 <form method="POST" id="form-bayar-teller">
                     <input type="hidden" name="action" value="bayar_teller">
                     <input type="hidden" name="student_id" id="teller-student-id">
