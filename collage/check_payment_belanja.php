@@ -8,7 +8,7 @@ $password = "hakim123123123";
 $dbname = "ypikhair_datautama";
 
 // Tripay Config
-define('TRIPAY_API_KEY', 'ytprKupP1zxpZg6XeFBkpe6oJjrT7jaae1zROemR');
+define('TRIPAY_API_KEY', 'Hfdqxnb7S2wPkU9AwghJkBoP7BwUmeZ5emhGC0rQ');
 define('TRIPAY_API_URL', 'https://tripay.co.id/api');
 
 header('Content-Type: application/json');

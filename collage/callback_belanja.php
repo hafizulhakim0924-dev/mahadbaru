@@ -11,7 +11,7 @@ $password = "hakim123123123";
 $dbname = "ypikhair_datautama";
 
 // Tripay Config
-define('TRIPAY_PRIVATE_KEY', 'RlGRM-dPVm0-4gxYN-AakNR-pI3Li');
+define('TRIPAY_PRIVATE_KEY', 'peyOY-QK9Bw-dTcOF-ISsZV-kHZvx');
 
 // Get callback data
 $json = file_get_contents('php://input');

@@ -11,7 +11,7 @@ $password = "Hakim123!";
 $dbname = "ypikhair_mahadzubair";
 
 // Tripay Config
-define('TRIPAY_PRIVATE_KEY', 'RlGRM-dPVm0-4gxYN-AakNR-pI3Li');
+define('TRIPAY_PRIVATE_KEY', 'peyOY-QK9Bw-dTcOF-ISsZV-kHZvx');
 
 // Validasi IP Tripay (whitelist)
 $valid_ips = [

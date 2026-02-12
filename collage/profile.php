@@ -185,9 +185,9 @@ $student_id = isset($_SESSION['student']['id'])
     : intval($_SESSION['user_id']);
 
 // Tripay Config
-define('TRIPAY_API_KEY', 'ytprKupP1zxpZg6XeFBkpe6oJjrT7jaae1zROemR');
-define('TRIPAY_PRIVATE_KEY', 'RlGRM-dPVm0-4gxYN-AakNR-pI3Li');
-define('TRIPAY_MERCHANT_CODE', 'T47806');
+define('TRIPAY_API_KEY', 'Hfdqxnb7S2wPkU9AwghJkBoP7BwUmeZ5emhGC0rQ');
+define('TRIPAY_PRIVATE_KEY', 'peyOY-QK9Bw-dTcOF-ISsZV-kHZvx');
+define('TRIPAY_MERCHANT_CODE', 'T47104');
 define('TRIPAY_API_URL', 'https://tripay.co.id/api');
 
 // Payment Config
@@ -274,7 +274,7 @@ function createTripayPayment($amount, $order_id, $customer_name, $customer_email
         'return_url' => 'https://ypi-khairaummah.sch.id/profile.php?tab=bayar',
         'expired_time' => (time() + (PAYMENT_EXPIRY_HOURS * 3600)),
         'signature' => $signature,
-        'callback_url' => 'https://ypi-khairaummah.sch.id/callback.php'
+        'callback_url' => 'http://kolaboraksi.app.rangkiangpedulinegeri.org/callback.php'
     ];
     
     $headers = [
