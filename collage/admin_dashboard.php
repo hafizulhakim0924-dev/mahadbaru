@@ -268,6 +268,52 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         }
     }
     
+    // Tambah Admin / Dosen / Keuangan (hanya superadmin)
+    elseif ($action == 'tambah_admin' && $is_superadmin) {
+        $role_type = trim($_POST['role_type'] ?? '');
+        $nama = trim($_POST['nama'] ?? '');
+        $username = trim($_POST['username'] ?? '');
+        $password = trim($_POST['password'] ?? '');
+        
+        $allowed_roles = ['admin', 'dosen', 'keuangan'];
+        if (!in_array($role_type, $allowed_roles)) {
+            $error = "Pilih tipe: Admin, Dosen, atau Keuangan!";
+        } elseif (empty($nama) || empty($username) || empty($password)) {
+            $error = "Nama, username, dan password harus diisi!";
+        } else {
+            try {
+                if ($role_type == 'admin') {
+                    $stmt = $conn->prepare("INSERT INTO admin (nama, username, password, role) VALUES (?, ?, ?, 'admin')");
+                    $stmt->bind_param("sss", $nama, $username, $password);
+                } elseif ($role_type == 'dosen') {
+                    $stmt = $conn->prepare("INSERT INTO dosen (nama, username, password) VALUES (?, ?, ?)");
+                    $stmt->bind_param("sss", $nama, $username, $password);
+                } else {
+                    $email_opt = '';
+                    $stmt = $conn->prepare("INSERT INTO keuangan (nama, username, password, email) VALUES (?, ?, ?, ?)");
+                    $stmt->bind_param("ssss", $nama, $username, $password, $email_opt);
+                }
+                if (!isset($stmt)) {
+                    $error = "Gagal mempersiapkan query.";
+                } elseif ($stmt->execute()) {
+                    $success = "Akun " . ucfirst($role_type) . " berhasil ditambahkan! (Username: $username)";
+                    $stmt->close();
+                } else {
+                    $err = $stmt->error;
+                    $stmt->close();
+                    if (strpos($err, 'Duplicate') !== false) {
+                        $error = "Username sudah dipakai. Gunakan username lain.";
+                    } else {
+                        $error = "Gagal menambah akun: " . $err;
+                    }
+                }
+            } catch (Exception $e) {
+                $error = "Error: " . $e->getMessage();
+                error_log("AdminDashboard - Tambah Admin Error: " . $e->getMessage());
+            }
+        }
+    }
+    
     // Bayar Tagihan melalui Teller
     elseif ($action == 'bayar_teller') {
         $student_id = intval($_POST['student_id'] ?? 0);
@@ -620,6 +666,10 @@ $total_hari_ini = 0;
 $total_bulan_ini = 0;
 $total_teller_hari_ini = 0;
 $total_aplikasi_hari_ini = 0;
+$students_login_list = [];
+$list_admin = [];
+$list_dosen = [];
+$list_keuangan = [];
 
 try {
     // Get barang
@@ -638,6 +688,42 @@ try {
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
             $students_list[] = $row;
+        }
+    }
+    $stmt->close();
+    
+    // Get students with password (untuk daftar username/password login siswa)
+    $stmt = $conn->prepare("SELECT id, name, class, password FROM students ORDER BY name ASC");
+    if ($stmt && $stmt->execute()) {
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $students_login_list[] = $row;
+        }
+    }
+    $stmt->close();
+    
+    // Get list admin, dosen, keuangan (untuk menu Tambah Admin)
+    $stmt = $conn->prepare("SELECT id, nama, username, role FROM admin ORDER BY username ASC");
+    if ($stmt && $stmt->execute()) {
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $list_admin[] = $row;
+        }
+    }
+    $stmt->close();
+    $stmt = $conn->prepare("SELECT id, nama, username FROM dosen ORDER BY username ASC");
+    if ($stmt && $stmt->execute()) {
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $list_dosen[] = $row;
+        }
+    }
+    $stmt->close();
+    $stmt = $conn->prepare("SELECT id, nama, username FROM keuangan ORDER BY username ASC");
+    if ($stmt && $stmt->execute()) {
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $list_keuangan[] = $row;
         }
     }
     $stmt->close();
@@ -1044,6 +1130,18 @@ try {
                 <h3>Daftar Siswa & Tagihan</h3>
                 <p>Lihat siswa dan tagihannya</p>
             </div>
+            <div class="menu-card <?= $current_tab == 'daftar_login_siswa' ? 'active' : '' ?>" onclick="showSection('daftar_login_siswa')">
+                <div class="menu-card-icon">🔑</div>
+                <h3>Daftar Username & Password Siswa</h3>
+                <p>List ID dan password login siswa</p>
+            </div>
+            <?php if ($is_superadmin): ?>
+            <div class="menu-card <?= $current_tab == 'tambah_admin' ? 'active' : '' ?>" onclick="showSection('tambah_admin')">
+                <div class="menu-card-icon">➕</div>
+                <h3>Tambah Admin</h3>
+                <p>Tambah akun Admin, Dosen, atau Keuangan</p>
+            </div>
+            <?php endif; ?>
         </div>
         
         <!-- Content Area -->
@@ -1445,6 +1543,146 @@ try {
                     </table>
                 <?php endif; ?>
             </div>
+            
+            <!-- Daftar Username & Password Siswa Section -->
+            <div id="section-daftar_login_siswa" class="content-section <?= $current_tab == 'daftar_login_siswa' ? 'active' : '' ?>">
+                <h2 style="margin-bottom: 20px; color: #2d3748;">🔑 Daftar Username & Password Siswa</h2>
+                <p style="margin-bottom: 15px; color: #64748b; font-size: 14px;">Siswa login dengan <strong>ID</strong> (sebagai username) dan <strong>Password</strong> di bawah. Gunakan halaman Login, pilih tipe <strong>Siswa</strong>.</p>
+                <?php if (empty($students_login_list)): ?>
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔑</div>
+                        <h3>Belum Ada Data Siswa</h3>
+                        <p>Data siswa dan password akan tampil di sini</p>
+                    </div>
+                <?php else: ?>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID (Username Login)</th>
+                                    <th>Nama</th>
+                                    <th>Kelas</th>
+                                    <th>Password</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($students_login_list as $s): ?>
+                                    <tr>
+                                        <td><strong><?= (int)$s['id'] ?></strong></td>
+                                        <td><?= sanitize($s['name']) ?></td>
+                                        <td><?= sanitize($s['class'] ?? '-') ?></td>
+                                        <td><code style="background:#f1f5f9;padding:4px 8px;border-radius:4px;"><?= sanitize($s['password'] ?? '-') ?></code></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+            
+            <!-- Tambah Admin Section (hanya superadmin) -->
+            <?php if ($is_superadmin): ?>
+            <div id="section-tambah_admin" class="content-section <?= $current_tab == 'tambah_admin' ? 'active' : '' ?>">
+                <h2 style="margin-bottom: 20px; color: #2d3748;">➕ Tambah Admin / Dosen / Keuangan</h2>
+                <p style="margin-bottom: 20px; color: #64748b; font-size: 14px;">Hanya Superadmin yang dapat menambah akun. Pilih tipe lalu isi nama, username, dan password.</p>
+                
+                <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                    <h3 style="margin-bottom: 15px; color: #2d3748;">Tambah Akun Baru</h3>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="tambah_admin">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div class="form-group">
+                                <label>Tipe Akun *</label>
+                                <select name="role_type" required>
+                                    <option value="">-- Pilih Tipe --</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="dosen">Dosen</option>
+                                    <option value="keuangan">Keuangan</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Nama Lengkap *</label>
+                                <input type="text" name="nama" placeholder="Nama lengkap" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Username *</label>
+                                <input type="text" name="username" placeholder="Untuk login" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Password *</label>
+                                <input type="text" name="password" placeholder="Password login" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn">➕ Tambah Akun</button>
+                    </form>
+                </div>
+                
+                <h3 style="margin-bottom: 15px; color: #2d3748;">Daftar Akun yang Ada</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+                    <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                        <div style="background: #667eea; color: white; padding: 10px 15px; font-weight: 600;">Admin</div>
+                        <div style="padding: 15px; max-height: 300px; overflow-y: auto;">
+                            <?php if (empty($list_admin)): ?>
+                                <p style="color: #718096;">Belum ada admin (kecuali Superadmin)</p>
+                            <?php else: ?>
+                                <table style="width:100%; font-size: 14px;">
+                                    <thead><tr><th>Username</th><th>Nama</th><th>Role</th></tr></thead>
+                                    <tbody>
+                                        <?php foreach ($list_admin as $a): ?>
+                                            <tr>
+                                                <td><strong><?= sanitize($a['username']) ?></strong></td>
+                                                <td><?= sanitize($a['nama']) ?></td>
+                                                <td><?= sanitize($a['role'] ?? 'admin') ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                        <div style="background: #48bb78; color: white; padding: 10px 15px; font-weight: 600;">Dosen</div>
+                        <div style="padding: 15px; max-height: 300px; overflow-y: auto;">
+                            <?php if (empty($list_dosen)): ?>
+                                <p style="color: #718096;">Belum ada dosen</p>
+                            <?php else: ?>
+                                <table style="width:100%; font-size: 14px;">
+                                    <thead><tr><th>Username</th><th>Nama</th></tr></thead>
+                                    <tbody>
+                                        <?php foreach ($list_dosen as $d): ?>
+                                            <tr>
+                                                <td><strong><?= sanitize($d['username']) ?></strong></td>
+                                                <td><?= sanitize($d['nama']) ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                        <div style="background: #ed8936; color: white; padding: 10px 15px; font-weight: 600;">Keuangan</div>
+                        <div style="padding: 15px; max-height: 300px; overflow-y: auto;">
+                            <?php if (empty($list_keuangan)): ?>
+                                <p style="color: #718096;">Belum ada keuangan</p>
+                            <?php else: ?>
+                                <table style="width:100%; font-size: 14px;">
+                                    <thead><tr><th>Username</th><th>Nama</th></tr></thead>
+                                    <tbody>
+                                        <?php foreach ($list_keuangan as $k): ?>
+                                            <tr>
+                                                <td><strong><?= sanitize($k['username']) ?></strong></td>
+                                                <td><?= sanitize($k['nama']) ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
     
